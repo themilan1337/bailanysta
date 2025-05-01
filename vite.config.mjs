@@ -1,54 +1,53 @@
+// vite.config.mjs
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
-import path from 'path'; // Import the path module
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+    // base: Defines the public base path when served in production.
+    // During 'serve' (dev), it defaults to '/'
+    // During 'build', we set it relative to your web root, matching the outDir.
+    base: command === 'serve' ? '' : '/build/',
+
     plugins: [
         tailwindcss(), // Add the Tailwind CSS plugin
     ],
+
     build: {
-        // Output directory relative to project root
-        outDir: 'public/assets',
-        // Empty the output directory before building
-        emptyOutDir: true,
-        // Generate manifest file
-        manifest: '.vite/manifest.json', // Place manifest inside public/assets/.vite
+        // generate manifest.json in outDir
+        manifest: true,
+        // output directory relative to project root
+        outDir: 'public/build',
         rollupOptions: {
-            input: {
-                // Define your entry points
-                app: path.resolve(__dirname, 'resources/js/app.js'),
-                // Add other entry points if needed later
-                // styles: path.resolve(__dirname, 'resources/css/app.css') // Vite handles CSS imported in JS
-            },
-            output: {
-                // Ensures assets are placed directly in outDir without extra subfolders
-                entryFileNames: `[name].[hash].js`,
-                chunkFileNames: `[name].[hash].js`,
-                assetFileNames: `[name].[hash].[ext]`
-            }
+            // overwrite default .html entry
+            // input files relative to project root
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ],
         },
     },
+
     server: {
-        // Configure the development server
-        port: 5173, // Default Vite port
-        strictPort: true, // Exit if port is already in use
-        // Optional: Proxy requests to your PHP backend if running PHP's built-in server
+        // required to load scripts from custom host
+        origin: 'http://localhost:5173', // Ensure this matches the Vite dev server address
+
+        // Optional: configure server host/port if needed
+        host: 'localhost', // Or '0.0.0.0' to accept connections from network
+        port: 5173,
+        strictPort: true, // Don't try other ports if 5173 is busy
+
+        // Configure HMR (Hot Module Replacement)
+        hmr: {
+            host: 'localhost:8000', // Host for HMR websocket connection
+        },
+
+        // Optional: Proxy PHP requests if needed, though usually not
+        // required if you run PHP's server separately.
         // proxy: {
         //     '/': {
-        //         target: 'http://localhost:8000', // Your PHP dev server address
+        //         target: 'http://localhost:8000', // Your PHP server URL
         //         changeOrigin: true,
         //     }
         // }
-        // Configure server origin for HMR (Hot Module Replacement)
-        origin: 'http://localhost:5173'
-    },
-    // Set the public directory for asset resolution during dev
-    publicDir: 'public',
-    // Resolve aliases if needed (optional)
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, 'resources/js'),
-            '~': path.resolve(__dirname, 'resources'),
-        },
-    },
-});
+    }
+}));

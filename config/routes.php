@@ -1,24 +1,34 @@
 <?php
+// config/routes.php
 
-declare(strict_types=1);
+use App\Controllers\AuthController;
+use App\Controllers\FeedController;
+use App\Controllers\ProfileController; // Keep this
+use App\Controllers\PostController;
+use App\Controllers\CommentController;
 
-// Define application routes.
-// The callback function receives the FastRoute Dispatcher instance.
-return function(FastRoute\RouteCollector $r) {
-    // Home page
-    $r->addRoute('GET', '/', ['App\Controllers\HomeController', 'index']);
+/** @var FastRoute\RouteCollector $r */
 
-    // Example Login Route (we'll implement this later)
-    $r->addRoute('GET', '/login', ['App\Controllers\AuthController', 'showLogin']);
-    $r->addRoute('GET', '/auth/google', ['App\Controllers\AuthController', 'redirectToGoogle']);
-    $r->addRoute('GET', '/auth/google/callback', ['App\Controllers\AuthController', 'handleGoogleCallback']);
-    $r->addRoute('GET', '/logout', ['App\Controllers\AuthController', 'logout']);
+// --- Define Routes ---
 
-    // Example Profile Route (Level 1)
-    $r->addRoute('GET', '/profile', ['App\Controllers\ProfileController', 'index']);
+// Pages
+$r->addRoute('GET', '/', [FeedController::class, 'index']);
+$r->addRoute('GET', '/profile', [ProfileController::class, 'show']); // Route for viewing own profile
 
-    // Example Feed Route (Level 1)
-    $r->addRoute('GET', '/feed', ['App\Controllers\FeedController', 'index']);
+// Authentication
+$r->addRoute('GET', '/auth/google', [AuthController::class, 'redirectToGoogle']);
+$r->addRoute('GET', '/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+$r->addRoute('GET', '/logout', [AuthController::class, 'logout']);
 
-    // Add more routes here for posts, etc. later
-};
+// Profile Actions (New)
+$r->addRoute('POST', '/profile/update', [ProfileController::class, 'update']); // Update profile (nickname)
+$r->addRoute('POST', '/profile/delete', [ProfileController::class, 'destroy']); // Delete account (using POST)
+
+// Posts Actions
+$r->addRoute('POST', '/profile/posts', [ProfileController::class, 'storePost']); // Create post
+
+// API Routes (Likes, Comments)
+$r->addRoute('POST', '/api/posts/{id:\d+}/like', [PostController::class, 'like']);
+$r->addRoute('DELETE', '/api/posts/{id:\d+}/like', [PostController::class, 'unlike']);
+$r->addRoute('GET', '/api/posts/{postId:\d+}/comments', [CommentController::class, 'index']);
+$r->addRoute('POST', '/api/posts/{postId:\d+}/comments', [CommentController::class, 'store']);

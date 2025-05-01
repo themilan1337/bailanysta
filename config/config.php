@@ -1,72 +1,69 @@
 <?php
+// config/config.php
 
-declare(strict_types=1);
-
-use Dotenv\Dotenv;
-
-// Define project root directory
-define('BASE_PATH', dirname(__DIR__));
-
-// Load environment variables
-$dotenv = Dotenv::createImmutable(BASE_PATH);
-$dotenv->load(); // Load .env file
+// Autoload dependencies
+require_once __DIR__ . '/../vendor/autoload.php';
 
 // --- Application Configuration ---
-define('APP_ENV', $_ENV['APP_ENV'] ?? 'production');
-define('APP_DEBUG', filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN));
-define('APP_URL', rtrim($_ENV['APP_URL'] ?? 'http://localhost', '/'));
+define('BASE_URL', 'http://localhost:8000'); // NO trailing slash
+define('APP_ENV', 'development'); // 'development' or 'production'
 
-// --- Google API Configuration ---
-define('GOOGLE_CLIENT_ID', $_ENV['GOOGLE_CLIENT_ID'] ?? '');
-define('GOOGLE_CLIENT_SECRET', $_ENV['GOOGLE_CLIENT_SECRET'] ?? '');
-define('GOOGLE_REDIRECT_URI', $_ENV['GOOGLE_REDIRECT_URI'] ?? '');
+// --- Database Configuration ---
+define('DB_HOST', '127.0.0.1');       // Or your DB host (e.g., 'localhost')
+define('DB_PORT', '3306');            // Default MySQL port
+define('DB_DATABASE', 'bailanysta');  // Your database name
+define('DB_USERNAME', 'root');        // Your database username
+define('DB_PASSWORD', '');            // Your database password (use quotes even if empty)
+define('DB_CHARSET', 'utf8mb4');
 
-// --- Database Configuration (Placeholder) ---
-define('DB_CONNECTION', $_ENV['DB_CONNECTION'] ?? 'mysql');
-define('DB_HOST', $_ENV['DB_HOST'] ?? '127.0.0.1');
-define('DB_PORT', $_ENV['DB_PORT'] ?? '3306');
-define('DB_DATABASE', $_ENV['DB_DATABASE'] ?? '');
-define('DB_USERNAME', $_ENV['DB_USERNAME'] ?? 'root');
-define('DB_PASSWORD', $_ENV['DB_PASSWORD'] ?? '');
+// --- Google API Credentials (Placeholder) ---
+define('GOOGLE_CLIENT_ID', '2547332709-jmtah33q6j6eu7copud1c6s8356vml4v.apps.googleusercontent.com');
+define('GOOGLE_CLIENT_SECRET', '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');
+define('GOOGLE_REDIRECT_URI', BASE_URL . '/auth/google/callback');
 
-// --- Vite Asset Configuration ---
-// Function to check if Vite dev server is running
-function isViteDevelopment(): bool
-{
-    // Check for environment variable or if manifest doesn't exist
-    if (APP_ENV !== 'local') {
-        return false;
-    }
-    // Try to connect to Vite HMR port
-    $viteServer = 'http://localhost:5173'; // Use Vite dev server URL
-    $handle = @fopen($viteServer, 'r');
-    if ($handle !== false) {
-        fclose($handle);
-        return true;
-    }
-    return false;
+// --- Helper Function & Error Reporting (Keep as before) ---
+function config(string $key, $default = null) {
+    $constant_name = strtoupper($key);
+    return defined($constant_name) ? constant($constant_name) : $default;
 }
 
-define('VITE_DEVELOPMENT', isViteDevelopment());
-define('VITE_MANIFEST_PATH', BASE_PATH . '/public/assets/.vite/manifest.json');
-define('VITE_SERVER', 'http://localhost:5173'); // Vite dev server URL
-
-// Error reporting based on environment
-if (APP_DEBUG) {
-    ini_set('display_errors', '1');
-    ini_set('display_startup_errors', '1');
-    error_reporting(E_ALL);
+if (APP_ENV === 'development') {
+    ini_set('display_errors', 1); error_reporting(E_ALL);
 } else {
-    ini_set('display_errors', '0');
-    ini_set('display_startup_errors', '0');
-    error_reporting(0);
-    // Consider setting up proper logging for production here
+    ini_set('display_errors', 0); error_reporting(0);
 }
 
-// Start session if not already started (important for auth)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// --- Simple PDO Database Connection Function ---
+/**
+ * Establishes a PDO database connection.
+ * @return PDO|null Returns a PDO instance on success, null on failure.
+ */
+function get_db_connection(): ?PDO {
+    static $pdo = null; // Static variable to hold the connection (singleton pattern)
 
-// Include helper functions if you create them later
-// require_once BASE_PATH . '/app/Core/helpers.php';
+    if ($pdo === null) {
+        $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_DATABASE . ";charset=" . DB_CHARSET;
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Throw exceptions on error
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Fetch results as associative arrays
+            PDO::ATTR_EMULATE_PREPARES   => false,                  // Use native prepared statements
+        ];
+
+        try {
+            $pdo = new PDO($dsn, DB_USERNAME, DB_PASSWORD, $options);
+        } catch (\PDOException $e) {
+            // Log the error in production, show details in development
+            error_log("Database Connection Error: " . $e->getMessage());
+            if (APP_ENV === 'development') {
+                // Display error details only in development for security
+                die("Database Connection Error: " . $e->getMessage());
+            } else {
+                // Provide a generic error message in production
+                die("Database connection failed. Please try again later.");
+            }
+            // Optionally return null or throw the exception depending on how you want to handle failures globally
+            // return null;
+        }
+    }
+    return $pdo;
+}

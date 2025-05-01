@@ -19,6 +19,7 @@
   "homepage": "https://github.com/themilan1337/bailanysta#readme",
   "description": "",
   "dependencies": {
+    "@tailwindcss/postcss": "^4.1.5",
     "@tailwindcss/vite": "^4.1.5",
     "tailwindcss": "^4.1.5"
   }

@@ -1,117 +1,148 @@
 <?php
-declare(strict_types=1);
-require_once BASE_PATH . '/app/Core/helpers.php';
+// app/Core/helpers.php
 
-if (!function_exists('vite_assets')) {
-    /**
-     * Generates script and link tags for Vite assets.
-     * Needs access to constants defined in config.php.
-     *
-     * @return string HTML tags for Vite assets.
-     */
-    function vite_assets(): string
-    {
-        $viteServer = VITE_SERVER; // e.g., http://localhost:5173
-        $manifestPath = VITE_MANIFEST_PATH; // e.g., BASE_PATH . '/public/assets/.vite/manifest.json'
-        $basePath = rtrim(str_replace($_SERVER['DOCUMENT_ROOT'], '', BASE_PATH . '/public'), '/'); // Relative web path to public dir
+// ... (view function remains the same) ...
 
-        if (VITE_DEVELOPMENT) {
-            // Development mode: Include Vite client and entry point script
-            return <<<HTML
-                <script type="module" src="{$viteServer}/@vite/client"></script>
-                <script type="module" src="{$viteServer}/resources/js/app.js"></script>
-            HTML;
-        } else {
-            // Production mode: Read manifest.json
-            if (!file_exists($manifestPath)) {
-                error_log('Vite manifest not found at: ' . $manifestPath);
-                return '<!-- Vite Manifest Not Found -->';
+/**
+ * Generates HTML tags for Vite assets (CSS & JS).
+ * Reads manifest.json for production builds.
+ * Connects to Vite dev server for development.
+ *
+ * @param string|string[] $entrypoints Entry point file(s) relative to the project root (e.g., 'resources/js/app.js').
+ * @return string HTML tags for the assets.
+ */
+function vite_assets(string|array $entrypoints): string
+{
+    $viteDevServerBase = 'http://localhost:5173'; // Base URL of the Vite dev server
+    $manifestPath = dirname(__DIR__, 2) . '/public/build/.vite/manifest.json'; // Correct path to manifest
+    $isDev = APP_ENV === 'development'; // Rely on APP_ENV
+
+    if (!is_array($entrypoints)) {
+        $entrypoints = [$entrypoints];
+    }
+
+    $html = '';
+
+    // Try to detect Vite dev server more reliably in dev mode
+    $devServerIsRunning = false;
+    if ($isDev) {
+        $ch = curl_init($viteDevServerBase . '/@vite/client');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1); // Short timeout
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_NOBODY, true); // We only need headers/connection status
+        curl_exec($ch);
+        $error = curl_errno($ch);
+        curl_close($ch);
+        $devServerIsRunning = ($error === 0); // CURLE_OK means connection succeeded
+         if (!$devServerIsRunning) {
+             error_log("Vite dev server not reachable at $viteDevServerBase. Did you run 'npm run dev'?");
+         }
+    }
+
+
+    if ($isDev && $devServerIsRunning) {
+        // Development mode: Include Vite client and entry points directly from Vite server
+        $html .= '<script type="module" src="' . $viteDevServerBase . '/@vite/client"></script>';
+        foreach ($entrypoints as $entry) {
+            $html .= '<script type="module" src="' . $viteDevServerBase . '/' . ltrim($entry, '/') . '"></script>';
+        }
+    } else {
+        // Production mode (or dev server not running): Use manifest.json
+        if (!file_exists($manifestPath)) {
+             $message = "manifest.json not found at {$manifestPath}. Did you run 'npm run build'?";
+             error_log($message);
+             // Optionally return an HTML comment or throw an exception in production
+             return "<!-- {$message} -->";
+        }
+
+        $manifest = json_decode(file_get_contents($manifestPath), true);
+        if ($manifest === null) {
+            $message = "Failed to decode manifest.json at {$manifestPath}.";
+            error_log($message);
+            return "<!-- {$message} -->";
+        }
+
+
+        foreach ($entrypoints as $entry) {
+            $entryKey = ltrim($entry, '/'); // Ensure key matches manifest format
+            if (!isset($manifest[$entryKey])) {
+                 error_log("Entrypoint '{$entryKey}' not found in manifest.json");
+                 continue;
             }
 
-            $manifest = json_decode(file_get_contents($manifestPath), true);
-            if (!$manifest) {
-                error_log('Error decoding Vite manifest: ' . $manifestPath);
-                 return '<!-- Error reading Vite Manifest -->';
+            $entryData = $manifest[$entryKey];
+            $baseUrl = rtrim(config('BASE_URL', ''), '/'); // Get base URL from config
+            $buildPath = '/build/'; // Matches vite config 'base' for production
+
+            // Add the main JS file for the entry point
+            if (isset($entryData['file'])) {
+                $html .= '<script type="module" src="' . $baseUrl . $buildPath . $entryData['file'] . '"></script>';
             }
 
-            // Find the entry point script (adjust key if your input name in vite.config.js is different)
-            $jsEntryKey = 'resources/js/app.js'; // Matches input key in vite.config.js
-            $html = '';
-
-            if (isset($manifest[$jsEntryKey])) {
-                $entry = $manifest[$jsEntryKey];
-                $jsFile = $basePath . '/assets/' . $entry['file'];
-                $html .= "<script type=\"module\" src=\"{$jsFile}\"></script>\n";
-
-                // Include CSS file(s) associated with the entry point
-                if (isset($entry['css']) && is_array($entry['css'])) {
-                    foreach ($entry['css'] as $cssFile) {
-                        $cssPath = $basePath . '/assets/' . $cssFile;
-                        $html .= "<link rel=\"stylesheet\" href=\"{$cssPath}\">\n";
-                    }
+            // Add CSS files associated with the entry point
+            if (isset($entryData['css']) && is_array($entryData['css'])) {
+                foreach ($entryData['css'] as $cssFile) {
+                    $html .= '<link rel="stylesheet" href="' . $baseUrl . $buildPath . $cssFile . '">';
                 }
-                 // Include CSS file directly associated with the entry if present (Tailwind 4 pattern?)
-                if (isset($entry['isEntry']) && $entry['isEntry'] && isset($entry['css'])) {
-                     // Vite/Tailwind might put CSS here in some configs
-                     // Let's re-check if the above loop didn't catch it
-                     // This might be redundant depending on exact Vite/Tailwind v4 interaction
-                }
-
-            } else {
-                 error_log("Entry point '{$jsEntryKey}' not found in Vite manifest: " . $manifestPath);
-                 return "<!-- Entry point {$jsEntryKey} not found in manifest -->";
             }
 
-            // Preload imports (optional but good for performance)
-             if (isset($entry['imports']) && is_array($entry['imports'])) {
-                 foreach ($entry['imports'] as $import) {
-                     if(isset($manifest[$import]['file'])) {
-                         $importFile = $basePath . '/assets/' . $manifest[$import]['file'];
-                        // Check if it's a CSS or JS file based on extension
-                         if (str_ends_with($importFile, '.css')) {
-                             $html .= "<link rel=\"modulepreload\" href=\"{$importFile}\" as=\"style\">\n";
-                         } else if (str_ends_with($importFile, '.js')) {
-                             $html .= "<link rel=\"modulepreload\" href=\"{$importFile}\" as=\"script\">\n";
-                         } else {
-                              $html .= "<link rel=\"modulepreload\" href=\"{$importFile}\">\n"; // Generic preload
+             // Preload imported JS modules and their CSS (optional but good for performance)
+            if (isset($entryData['imports']) && is_array($entryData['imports'])) {
+                 foreach ($entryData['imports'] as $importKey) {
+                     if(isset($manifest[$importKey]['file'])) {
+                         $html .= '<link rel="modulepreload" href="' . $baseUrl . $buildPath . $manifest[$importKey]['file'] . '">';
+                     }
+                     // Handle CSS from imported modules
+                     if (isset($manifest[$importKey]['css']) && is_array($manifest[$importKey]['css'])) {
+                         foreach ($manifest[$importKey]['css'] as $cssFile) {
+                             // Avoid duplicating CSS links if already added by main entry
+                             if (strpos($html, 'href="' . $baseUrl . $buildPath . $cssFile . '"') === false) {
+                                 $html .= '<link rel="stylesheet" href="' . $baseUrl . $buildPath . $cssFile . '">';
+                             }
                          }
                      }
                  }
              }
-
-            return rtrim($html);
         }
     }
+
+    return $html;
 }
 
-if (!function_exists('view')) {
-    /**
-     * Simple view rendering helper.
-     *
-     * @param string $viewName The name of the view file (e.g., 'pages.home' or 'layouts.app')
-     * @param array $data Data to extract into the view's scope
-     * @return void
-     */
-    function view(string $viewName, array $data = []): void
-    {
-        // Convert dot notation to directory separators
-        $viewPath = str_replace('.', '/', $viewName);
-        $fullPath = BASE_PATH . '/app/Views/' . $viewPath . '.php';
+// Ensure view function is also here
+function view(string $view, array $data = []): string {
+    // ... view function code from previous answer ...
+     // Construct the full path to the view file
+     $viewPath = dirname(__DIR__) . '/Views/' . str_replace('.', '/', $view) . '.php'; // Adjusted path
 
-        if (file_exists($fullPath)) {
-            // Extract data variables into the current symbol table
-            extract($data);
+     if (!file_exists($viewPath)) {
+         error_log("View file not found: {$viewPath}");
+         // In production, you might want a more user-friendly error
+         return "Error: View file '{$view}' not found.";
+         // throw new \InvalidArgumentException("View file not found: {$viewPath}");
+     }
 
-            // Include the view file
-            include $fullPath;
-        } else {
-            error_log("View file not found: " . $fullPath);
-            echo "Error: View '{$viewName}' not found.";
-            // Optionally throw an exception or show a more user-friendly error
-        }
-    }
+     // Extract data into the local scope
+     extract($data);
+
+     // Start output buffering for the view content
+     ob_start();
+     include $viewPath;
+     $content = ob_get_clean(); // This is the content of the specific view file
+
+     // Check for a layout file
+     $layoutPath = dirname(__DIR__) . '/Views/layouts/app.php'; // Adjusted path
+     if (file_exists($layoutPath)) {
+          // If a layout exists, buffer its output
+          ob_start();
+          // Include the layout. The layout should use the $content variable.
+          include $layoutPath;
+          // Return the complete layout content
+          return ob_get_clean();
+     } else {
+          // If no layout, just return the view content
+          return $content;
+     }
 }
 
-// Include this helper file in config.php or index.php early on
-// Add this line near the end of config/config.php:
-// require_once BASE_PATH . '/app/Core/helpers.php';
