@@ -28,52 +28,56 @@ class FeedController
                       || (isset($_GET['ajax']) && $_GET['ajax'] == '1')
                       || (strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false);
 
-        $limit = isset($_GET['limit']) && is_numeric($_GET['limit']) ? max(1, (int)$_GET['limit']) : self::DEFAULT_LIMIT; // Now uses the defined constant
-        $offset = isset($_GET['offset']) && is_numeric($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
-
-        if ($this->db === null) {
-            if ($isAjaxRequest) {
-                header('Content-Type: application/json'); http_response_code(500);
-                echo json_encode(['success' => false, 'message' => 'Database unavailable.', 'posts' => []]);
-            } else {
-                echo view('pages.feed.index', ['pageTitle' => 'Feed', 'posts' => [], 'error' => 'Could not connect to the database.']);
-            }
-            exit;
-        }
-
-        $posts = [];
-        $error = null;
-
-        $sql = " SELECT p.id AS post_id, p.content, p.image_url, p.created_at AS post_created_at, u.id AS author_id, u.name AS author_name, u.picture_url AS author_picture_url, (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count, (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count";
-        if ($this->currentUserId !== null) { $sql .= ", (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id AND l.user_id = :current_user_id) > 0 AS user_liked"; }
-        else { $sql .= ", 0 AS user_liked"; }
-        $sql .= " FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
-
-        try {
-            $stmt = $this->db->prepare($sql);
-            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-            if ($this->currentUserId !== null) { $stmt->bindParam(':current_user_id', $this->currentUserId, PDO::PARAM_INT); }
-            $stmt->execute();
-            $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($posts as &$post) {
-                 $post['time_ago'] = $this->formatTimeAgo($post['post_created_at'] ?? null);
-                 $post['user_liked'] = (bool)($post['user_liked'] ?? false);
-            }
-            unset($post);
-        } catch (PDOException $e) {
-            error_log("Error fetching feed posts (offset:{$offset}, limit:{$limit}): " . $e->getMessage());
-            $error = APP_ENV === 'development' ? 'Error fetching posts: ' . $e->getMessage() : 'Could not retrieve posts.';
-        }
-
+        // --- Only fetch data for AJAX requests ---
         if ($isAjaxRequest) {
             header('Content-Type: application/json');
-            if ($error !== null) { http_response_code(500); echo json_encode(['success' => false, 'message' => $error, 'posts' => []]); }
-            else { echo json_encode(['success' => true, 'posts' => $posts]); }
+            $limit = isset($_GET['limit']) && is_numeric($_GET['limit']) ? max(1, (int)$_GET['limit']) : self::DEFAULT_LIMIT;
+            $offset = isset($_GET['offset']) && is_numeric($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
+
+            if ($this->db === null) {
+                http_response_code(500); echo json_encode(['success' => false, 'message' => 'Database unavailable.', 'posts' => []]); exit;
+            }
+
+            $posts = []; $error = null;
+            $sql = " SELECT p.id AS post_id, ... "; // Same SQL as before
+            if ($this->currentUserId !== null) { $sql .= ", ... user_liked ..."; } else { $sql .= ", 0 AS user_liked"; }
+            $sql .= " FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC LIMIT :limit OFFSET :offset";
+
+            try {
+                $stmt = $this->db->prepare($sql);
+                $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+                $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+                if ($this->currentUserId !== null) { $stmt->bindParam(':current_user_id', $this->currentUserId, PDO::PARAM_INT); }
+                $stmt->execute();
+                $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($posts as &$post) {
+                     $post['time_ago'] = $this->formatTimeAgo($post['post_created_at'] ?? null);
+                     $post['user_liked'] = (bool)($post['user_liked'] ?? false);
+                      // Link hashtags before sending JSON if that feature is active
+                     // $escapedContent = htmlspecialchars($post['content'] ?? '');
+                     // $post['content'] = nl2br(link_hashtags($escapedContent));
+                     // Revert to plain text since hashtags were reverted:
+                     $post['content'] = nl2br(htmlspecialchars($post['content'] ?? ''));
+
+                } unset($post);
+                echo json_encode(['success' => true, 'posts' => $posts]);
+
+            } catch (PDOException $e) {
+                error_log("Error fetching feed posts AJAX (offset:{$offset}, limit:{$limit}): " . $e->getMessage());
+                http_response_code(500); $errorMsg = APP_ENV === 'development' ? 'DB Error: '.$e->getMessage() : 'Error fetching posts.';
+                echo json_encode(['success' => false, 'message' => $errorMsg, 'posts' => []]);
+            }
+            exit; // Exit after JSON response
+
         } else {
-            echo view('pages.feed.index', ['pageTitle' => 'Feed', 'posts' => $posts, 'error' => $error ]);
+            // --- Initial HTML Request: Render page shell WITHOUT posts ---
+            echo view('pages.feed.index', [
+                'pageTitle' => 'Feed',
+                'posts' => [], // Send empty array initially
+                'error' => null // No error initially
+            ]);
+            exit; // Exit after rendering view
         }
-        exit;
     }
 
     public function search(): void

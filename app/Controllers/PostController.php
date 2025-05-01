@@ -175,13 +175,13 @@ class PostController
             $success = $updateStmt->execute();
 
             if ($success) {
-                 http_response_code(200);
-                 echo json_encode([
-                     'success' => true,
-                     'message' => 'Post updated successfully.',
-                     // Return new content formatted with line breaks
-                     'newContentHtml' => nl2br($sanitizedContent)
-                 ]);
+                http_response_code(200);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Post updated successfully.',
+                    // Return content formatted as plain text with line breaks
+                    'newContentHtml' => nl2br(htmlspecialchars($newContent))
+                ]);
             } else {
                  http_response_code(500);
                  echo json_encode(['success' => false, 'message' => 'Failed to update post in database.']);

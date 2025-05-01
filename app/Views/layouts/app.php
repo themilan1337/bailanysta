@@ -140,5 +140,16 @@ $isLoggedIn = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
     </div>
 
+    <script>
+        const BASE_URL = '<?php echo rtrim(BASE_URL, '/'); ?>';
+        const CSRF_TOKEN = '<?php echo csrf_token(); // Add CSRF token ?>'; // <-- ADD THIS
+        <?php if ($isLoggedIn && isset($_SESSION['user']['id'])): ?>
+            const CURRENT_USER_ID = <?php echo (int)$_SESSION['user']['id']; ?>;
+            const SESSION_USER_PICTURE = '<?php echo htmlspecialchars($_SESSION['user']['picture_url'] ?? '', ENT_QUOTES, 'UTF-8'); ?>';
+        <?php else: ?>
+            const CURRENT_USER_ID = null; const SESSION_USER_PICTURE = null;
+        <?php endif; ?>
+    </script>
+
 </body>
 </html>

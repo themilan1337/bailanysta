@@ -27,6 +27,8 @@ $currentUser = $isLoggedIn ? ($_SESSION['user'] ?? null) : null;
     <?php if ($isLoggedIn && $currentUser): ?>
         <div class="bg-card border rounded-lg p-4 mb-6 shadow-sm">
             <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST" enctype="multipart/form-data" id="create-post-form-feed">
+
+                <?php echo csrf_field(); ?>
                 <h2 class="text-lg font-semibold mb-3 text-foreground">Create a New Post</h2>
 
                 <textarea id="feed_post_content" name="content" rows="3"

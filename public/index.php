@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../app/Core/helpers.php';
+
 /**
  * Bailanysta - Public Entry Point
  *
@@ -18,11 +21,10 @@ if (session_status() === PHP_SESSION_NONE) {
 // 1. Load Configuration & Dependencies
 // This should be the first include as it sets up constants, autoloading, etc.
 // It's assumed config.php requires the Composer autoloader.
-require_once __DIR__ . '/../config/config.php';
 
 // 2. Load Core Helper Functions (required explicitly if not autoloaded)
 // Contains essential functions like view() and vite_assets().
-require_once __DIR__ . '/../app/Core/helpers.php';
+
 
 
 // --- Routing Setup ---

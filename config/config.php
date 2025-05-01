@@ -31,11 +31,15 @@ function config(string $key, $default = null) {
     return defined($constant_name) ? constant($constant_name) : $default;
 }
 
-if (APP_ENV === 'development') {
-    ini_set('display_errors', 1); error_reporting(E_ALL);
-} else {
+ini_set('session.cookie_httponly', '1'); // Prevent JS access to session cookie
+ini_set('session.use_only_cookies', '1'); // Prevent session ID in URL
+if (APP_ENV === 'production') { // Only force secure cookies over HTTPS in production
+    ini_set('session.cookie_secure', '1'); // Send cookie only over HTTPS
     ini_set('display_errors', 0); error_reporting(0);
+} else {
+    ini_set('display_errors', 1); error_reporting(E_ALL); // Show all errors in development
 }
+ini_set('session.cookie_samesite', 'Lax'); // Mitigate CSRF with SameSite attribute
 
 // --- Simple PDO Database Connection Function ---
 /**

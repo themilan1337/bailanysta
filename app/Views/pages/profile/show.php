@@ -62,7 +62,9 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
     <?php if ($isOwnProfile): ?>
         <div class="bg-card border rounded-lg shadow-sm p-6">
            <h2 class="text-xl font-semibold mb-4 text-foreground">Edit Profile</h2>
-           <form action="<?php echo BASE_URL; ?>/profile/update" method="POST">
+            <form action="<?php echo BASE_URL; ?>/profile/update" method="POST">
+                <?php echo csrf_field(); ?>
+
                <div class="mb-4">
                    <label for="nickname" class="block text-sm font-medium text-muted-foreground mb-1">Nickname</label>
                    <input type="text" id="nickname" name="nickname"
@@ -80,11 +82,12 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
                         Save Changes
                     </button>
                </div>
-           </form>
+            </form>
         </div>
 
         <div class="bg-card border rounded-lg p-4 shadow-sm">
              <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST" enctype="multipart/form-data" id="create-post-form-profile">
+             <?php echo csrf_field(); ?>
                  <h2 class="text-lg font-semibold mb-3 text-foreground">Create a New Post</h2>
                   <textarea name="content" rows="4"
                             class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm"
@@ -119,6 +122,7 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
             <h2 class="text-xl font-semibold mb-3 text-destructive">Danger Zone</h2>
             <p class="text-sm text-muted-foreground mb-4">Deleting your account is permanent and cannot be undone. All your posts, comments, likes, and follower information will be lost.</p>
             <form action="<?php echo BASE_URL; ?>/profile/delete" method="POST" onsubmit="return confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.');">
+            <?php echo csrf_field(); ?>
                  <button type="submit"
                          class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4">
                      Delete My Account Permanently

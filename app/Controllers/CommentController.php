@@ -68,6 +68,7 @@ class CommentController
 
     public function store(int $postId): void
     {
+        verify_csrf_token();
         header('Content-Type: application/json');
 
         // --- LOG RAW INPUT ---

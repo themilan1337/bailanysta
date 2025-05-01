@@ -84,7 +84,7 @@ class NotificationController
      */
     public function markRead(): void
     {
-         header('Content-Type: application/json');
+        header('Content-Type: application/json');
         if ($this->currentUserId === null) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Auth required.']); exit; }
         if ($this->db === null) { http_response_code(500); echo json_encode(['success' => false, 'message' => 'DB error.']); exit; }
 

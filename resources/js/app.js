@@ -119,7 +119,8 @@ function nl2br(str) {
                     const response = await fetch(url, {
                         method: method,
                         headers: {
-                            'Accept': 'application/json'
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': CSRF_TOKEN
                         }
                     });
                     const data = await response.json();
@@ -265,6 +266,7 @@ function nl2br(str) {
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
+                            'X-CSRF-TOKEN': CSRF_TOKEN
                         },
                         body: JSON.stringify(payload)
                     });
@@ -334,6 +336,7 @@ function nl2br(str) {
                         method: method,
                         headers: {
                             'Accept': 'application/json',
+                            'X-CSRF-TOKEN': CSRF_TOKEN
                         }
                     });
                     const data = await response.json();
@@ -483,6 +486,7 @@ function nl2br(str) {
                         method: 'DELETE',
                         headers: {
                             'Accept': 'application/json',
+                            'X-CSRF-TOKEN': CSRF_TOKEN
                         }
                     });
                     const data = await response.json();
@@ -827,7 +831,7 @@ function nl2br(str) {
                                  </div>
             
                                  <div class="post-content-area px-4 ${ post.content ? 'pb-4' : 'pb-1'}">
-                                    ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${post.content}</div>` : ''}
+                                    ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${nl2br(escapeHtml(post.content))}</div>` : ''}
                                     ${ isAuthor ? `
                                         <form class="post-edit-form hidden mt-2" data-post-id="${post.post_id}">
                                             <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
@@ -1020,6 +1024,7 @@ function nl2br(str) {
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
+                            'X-CSRF-TOKEN': CSRF_TOKEN
                         },
                         body: JSON.stringify(payload)
                     });

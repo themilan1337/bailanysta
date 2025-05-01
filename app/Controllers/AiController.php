@@ -32,6 +32,7 @@ class AiController
      */
     public function generatePostIdea(): void
     {
+        verify_csrf_token();
         header('Content-Type: application/json');
 
         if ($this->currentUserId === null) {

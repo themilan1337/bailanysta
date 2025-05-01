@@ -40,8 +40,8 @@ $isAuthor = ($currentUserId !== null && isset($post['author_id']) && $currentUse
         </div>
         <?php if ($isAuthor): ?>
             <form class="post-edit-form hidden mt-2" data-post-id="<?php echo $post['post_id']; ?>">
+             <?php echo csrf_field(); ?>
                  <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required><?php echo htmlspecialchars($post['content']); ?></textarea>
-                 <?php // --- Image Edit Section REMOVED --- ?>
                  <div class="flex justify-end items-center space-x-2 mt-3">
                       <span class="edit-status text-xs text-muted-foreground"></span>
                       <button type="button" class="edit-cancel-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
@@ -90,6 +90,7 @@ $isAuthor = ($currentUserId !== null && isset($post['author_id']) && $currentUse
         </div>
          <?php if ($isLoggedIn): ?>
              <form class="add-comment-form flex items-start space-x-2 pt-3" data-post-id="<?php echo $post['post_id']; ?>">
+             <?php echo csrf_field(); ?>
                  <img src="<?php echo htmlspecialchars($_SESSION['user']['picture_url'] ?? 'https://via.placeholder.com/32/cccccc/969696?text='); ?>" alt="Your profile picture" class="w-8 h-8 rounded-full border bg-muted flex-shrink-0 mt-1">
                  <div class="flex-grow">
                      <textarea name="content" rows="1" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm" placeholder="Add a comment..."></textarea>
