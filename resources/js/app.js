@@ -895,6 +895,42 @@ function nl2br(str) {
                      initializePostOptions();
                 }
             };
+
+            const fetchAndRenderFeedPage = async (offset = 0, limit = postsPerLoad, replaceContainer = false) => {
+                if (isLoadingPosts || !feedPostsContainer) return;
+                isLoadingPosts = true;
+                if (loadingIndicator && !replaceContainer) loadingIndicator.style.display = 'block';
+                if (searchSpinner && replaceContainer) searchSpinner.classList.remove('hidden');
+                if (searchError) searchError.classList.add('hidden');
+                console.log(`Fetching feed page... Offset: ${offset}, Limit: ${limit}, Replace: ${replaceContainer}`);
+                try {
+                    const response = await fetch(`${APP_BASE_URL}/?ajax=1&offset=${offset}&limit=${limit}`);
+                    const data = await response.json();
+                    if (!response.ok || !data.success) { throw new Error(data.message || 'Failed feed load'); }
+                    if (replaceContainer) {
+                        if (data.posts && data.posts.length > 0) { renderPosts(data.posts, true); }
+                        else { feedPostsContainer.innerHTML = '<p class="text-center ...">No posts found.</p>'; }
+                        noMorePosts = (data.posts?.length ?? 0) < limit;
+                        console.log("Resetting infinite scroll state. No More:", noMorePosts);
+                        if (noMorePosts && loadingIndicator) { loadingIndicator.innerHTML = '<p ...>End of feed.</p>'; loadingIndicator.style.display = 'block'; }
+                        else if (loadingIndicator) { loadingIndicator.style.display = 'none'; }
+                    } else {
+                        if (data.posts && data.posts.length > 0) {
+                            renderPosts(data.posts, false);
+                            if (data.posts.length < limit) { noMorePosts = true; if(loadingIndicator) loadingIndicator.innerHTML = '<p ...>End of feed.</p>'; }
+                        } else { noMorePosts = true; if(loadingIndicator) loadingIndicator.innerHTML = '<p ...>No more posts.</p>'; }
+                    }
+                } catch (error) {
+                     console.error("Error fetching/rendering feed page:", error);
+                     if (replaceContainer && feedPostsContainer) { feedPostsContainer.innerHTML = `<p ...>Error loading feed.</p>`; }
+                     else if (loadingIndicator) { loadingIndicator.innerHTML = '<p ...>Error loading posts.</p>'; loadingIndicator.style.display = 'block'; }
+                     noMorePosts = true;
+                } finally {
+                     isLoadingPosts = false;
+                     if (loadingIndicator && !noMorePosts) loadingIndicator.style.display = 'none';
+                     if (searchSpinner) searchSpinner.classList.add('hidden');
+                }
+            };
             
             /**
              * Performs the search request.
@@ -902,59 +938,56 @@ function nl2br(str) {
             const performSearch = async (searchTerm) => {
                 if (!postsContainer || !searchSpinner || !searchError) return;
             
-                // Abort previous pending search request
-                if (currentSearchController) {
-                    currentSearchController.abort();
-                }
-                currentSearchController = new AbortController(); // Create a new controller for this request
+                if (currentSearchController) { currentSearchController.abort(); }
+                currentSearchController = new AbortController();
                 const signal = currentSearchController.signal;
             
-                searchSpinner.classList.remove('hidden'); // Show spinner
-                searchError.textContent = '';
-                searchError.classList.add('hidden');
+                searchSpinner.classList.remove('hidden');
+                searchError.textContent = ''; searchError.classList.add('hidden');
             
-                // If search term is empty, restore initial feed content
-                if (searchTerm.trim() === '') {
-                    postsContainer.innerHTML = initialFeedContent;
+                const trimmedSearchTerm = searchTerm.trim();
+            
+                // --- MODIFIED BLOCK for empty search ---
+                if (trimmedSearchTerm === '') {
+                    console.log("Search cleared, reloading initial feed page.");
+                    // Hide search spinner FIRST, then call fetch/render
                     searchSpinner.classList.add('hidden');
-                     // Re-initialize listeners for the original content
-                     initializeLikeButtons();
-                     initializeComments();
-                     initializePostOptions();
-                     // You might need to re-fetch original posts if state is lost,
-                     // or store initial state more robustly.
-                    return;
+                    // Call the function to fetch offset 0 and REPLACE the container
+                    await fetchAndRenderFeedPage(0, postsPerLoad, true);
+                    initializeInfiniteScroll();
+                    // No need for initialize* calls here, fetchAndRenderFeedPage handles it
+                    currentSearchController = null; // Clear controller since request is done (or will be handled by fetchAndRender)
+                    return; // Exit function after starting the reload
                 }
+                // --- END MODIFIED BLOCK ---
             
+                // --- Perform actual search ---
+                const query = encodeURIComponent(trimmedSearchTerm);
+                console.log(`Performing search for: ${trimmedSearchTerm}`);
                 try {
-                    const response = await fetch(`/api/posts/search?q=${encodeURIComponent(searchTerm)}`, { signal }); // Pass the signal
-            
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-            
+                    // Use signal for the actual search request
+                    const response = await fetch(`/api/posts/search?q=${query}`, { signal });
+                    if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
                     const data = await response.json();
             
                     if (data.success) {
-                        renderSearchResults(data.posts);
+                        renderSearchResults(data.posts); // Render search results (which calls renderPosts(..., true))
                     } else {
                         searchError.textContent = data.message || 'Search failed.';
                         searchError.classList.remove('hidden');
-                        postsContainer.innerHTML = ''; // Clear posts on error
+                        if(postsContainer) postsContainer.innerHTML = ''; // Clear posts on search error
                     }
-            
                 } catch (error) {
-                    if (error.name === 'AbortError') {
-                        console.log('Search request aborted.'); // Don't show error if intentionally aborted
-                    } else {
-                        console.error('Search network error:', error);
-                        searchError.textContent = 'Error performing search. Check connection.';
-                        searchError.classList.remove('hidden');
-                        postsContainer.innerHTML = ''; // Clear posts on error
-                    }
+                    if (error.name === 'AbortError') { console.log('Search request aborted.'); }
+                    else { console.error('Search network error:', error); searchError.textContent = 'Error performing search.'; searchError.classList.remove('hidden'); if(postsContainer) postsContainer.innerHTML = ''; }
                 } finally {
-                    searchSpinner.classList.add('hidden'); // Hide spinner
-                    currentSearchController = null; // Clear controller
+                    searchSpinner.classList.add('hidden');
+                    // Check if this specific request was aborted before clearing controller
+                     if (signal && !signal.aborted) {
+                         currentSearchController = null;
+                     } else if (!signal) { // Fallback if signal wasn't defined for some reason
+                         currentSearchController = null;
+                     }
                 }
             };
             
@@ -1213,26 +1246,31 @@ const initializeFollowListTriggers = () => {
 
 // --- Infinite Scroll Functionality ---
 
-const feedPostsContainer = document.getElementById('feed-posts-container'); // Container for posts
-const loadingIndicator = document.getElementById('loading-indicator'); // Loading indicator element
-let isLoadingPosts = false; // Flag to prevent multiple loads
-let noMorePosts = false; // Flag to stop loading
-let currentPostOffset = 0; // Start with offset 0
-const postsPerLoad = 5; // Should match FeedController::DEFAULT_LIMIT
+const feedPostsContainer = document.getElementById('feed-posts-container');
+const loadingIndicator = document.getElementById('loading-indicator');
+const searchInput = document.getElementById('search-input');
+const searchSpinner = document.getElementById('search-spinner');
+const searchError = document.getElementById('search-error');
+let isLoadingPosts = false;
+let noMorePosts = false;
+const postsPerLoad = 5; // Or your defined limit
+let searchTimeoutId = null;
+let currentSearchController = null;
 
 /**
  * Renders new posts fetched via infinite scroll.
  * Uses the simplified JS rendering approach. Re-initializes listeners.
  */
-const renderMorePosts = (posts) => {
-    if (!feedPostsContainer || !posts || posts.length === 0) return;
+const renderMorePosts = (posts, replace = false) => {
+    if (!feedPostsContainer || !posts) return;
 
     const isLoggedIn = !!document.querySelector('a[href$="/logout"]');
     const currentUserId = typeof CURRENT_USER_ID !== 'undefined' ? CURRENT_USER_ID : null;
 
-    posts.forEach(post => {
+    const postsHtml = posts.map(post => {
         const isAuthor = currentUserId !== null && currentUserId === post.author_id;
 
+        // Prepare button states
         const likeButtonClasses = `like-button flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md hover:bg-accent transition-colors ${post.user_liked ? 'text-red-500 font-medium' : 'text-muted-foreground'} ${!isLoggedIn ? 'cursor-not-allowed opacity-60' : ''}`;
         const likeButtonDisabled = !isLoggedIn ? 'disabled title="Login to like posts"' : '';
         const likeButtonAriaLabel = post.user_liked ? 'Unlike' : 'Like';
@@ -1243,96 +1281,111 @@ const renderMorePosts = (posts) => {
         const commentButtonClasses = `comment-toggle-button flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground hover:bg-accent transition-colors ${!isLoggedIn ? 'cursor-not-allowed opacity-60' : ''}`;
         const commentButtonDisabled = !isLoggedIn ? 'disabled title="Login to comment"' : '';
 
-        let authorPicSrc = post.author_picture_url || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541';
+        // Prepare image URLs
+        let authorPicSrc = post.author_picture_url || 'https://via.placeholder.com/40/cccccc/969696?text=';
         if (authorPicSrc && authorPicSrc.startsWith('/')) { authorPicSrc = APP_BASE_URL + authorPicSrc; }
         authorPicSrc = escapeHtml(authorPicSrc);
-        const currentUserPicSrc = escapeHtml(sessionUserPictureUrl || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541');
+        const currentUserPicSrc = escapeHtml(sessionUserPictureUrl || 'https://via.placeholder.com/32/cccccc/969696?text=');
         let postImageSrc = post.image_url ? APP_BASE_URL + escapeHtml(post.image_url) : null;
 
-        const postElement = document.createElement('article');
-        postElement.className = 'bg-card border rounded-lg shadow-sm overflow-hidden flex flex-col opacity-0 transition-opacity duration-500';
-        postElement.dataset.postContainerId = post.post_id;
-
-        postElement.innerHTML = `
-            <div class="p-4 flex items-start space-x-3">
-                <a href="${APP_BASE_URL}/profile/${post.author_id}">
-                    <img src="${authorPicSrc}" alt="${escapeHtml(post.author_name)}'s picture" class="w-10 h-10 rounded-full border bg-muted hover:opacity-80 transition-opacity">
-                </a>
-                <div class="flex-grow">
-                    <a href="${APP_BASE_URL}/profile/${post.author_id}" class="font-semibold text-foreground hover:underline">${escapeHtml(post.author_name)}</a>
-                    <p class="text-xs text-muted-foreground">${escapeHtml(post.time_ago)}</p>
-                </div>
-                ${ isAuthor ? `
-                     <div class="relative post-options-dropdown">
-                        <button type="button" aria-label="Post options" class="post-options-button p-1 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM10 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM11.5 15.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" /></svg></button>
-                        <div class="post-options-menu hidden absolute right-0 mt-1 w-36 bg-popover border rounded-md shadow-lg z-10 py-1 text-sm">
-                           <button type="button" class="post-edit-button block w-full text-left px-3 py-1.5 text-foreground hover:bg-accent">Edit Post</button>
-                           <button type="button" class="post-delete-button block w-full text-left px-3 py-1.5 text-destructive hover:bg-destructive/10">Delete Post</button>
+        // --- FULL HTML STRUCTURE ---
+        return `
+            <article class="bg-card border rounded-lg shadow-sm overflow-hidden flex flex-col ${replace ? 'opacity-100' : 'opacity-0 transition-opacity duration-500'}" data-post-container-id="${post.post_id}">
+                <div class="p-4 flex items-start space-x-3">
+                    <a href="${APP_BASE_URL}/profile/${post.author_id}">
+                        <img src="${authorPicSrc}" alt="${escapeHtml(post.author_name)}'s picture" class="w-10 h-10 rounded-full border bg-muted hover:opacity-80 transition-opacity">
+                    </a>
+                    <div class="flex-grow">
+                        <a href="${APP_BASE_URL}/profile/${post.author_id}" class="font-semibold text-foreground hover:underline">${escapeHtml(post.author_name)}</a>
+                        <p class="text-xs text-muted-foreground">${escapeHtml(post.time_ago)}</p>
+                    </div>
+                    ${ isAuthor ? `
+                        <div class="relative post-options-dropdown">
+                           <button type="button" aria-label="Post options" class="post-options-button p-1 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM10 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM11.5 15.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" /></svg></button>
+                           <div class="post-options-menu hidden absolute right-0 mt-1 w-36 bg-popover border rounded-md shadow-lg z-10 py-1 text-sm">
+                              <button type="button" class="post-edit-button block w-full text-left px-3 py-1.5 text-foreground hover:bg-accent">Edit Post</button>
+                              <button type="button" class="post-delete-button block w-full text-left px-3 py-1.5 text-destructive hover:bg-destructive/10">Delete Post</button>
+                           </div>
                         </div>
-                     </div>
-                ` : '' }
-            </div>
-
-            <div class="post-content-area px-4 ${ post.content ? 'pb-4' : 'pb-1'}">
-               ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${nl2br(escapeHtml(post.content))}</div>` : ''}
-               ${ isAuthor ? `
-                   <form class="post-edit-form hidden mt-2" data-post-id="${post.post_id}">
-                       <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
-                       <div class="flex justify-end items-center space-x-2 mt-2">
-                           <span class="edit-status text-xs text-muted-foreground"></span>
-                           <button type="button" class="edit-cancel-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
-                           <button type="submit" class="edit-save-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Save Changes</button>
-                       </div>
-                   </form>
-                   ` : '' }
-            </div>
-
-            ${ post.image_url ? `
-                <div class="post-display-image bg-muted border-t dark:border-gray-700 max-h-[60vh] overflow-hidden">
-                     <a href="${postImageSrc}" target="_blank" rel="noopener noreferrer" title="View full image">
-                          <img src="${postImageSrc}" alt="Post image" class="w-full h-auto object-contain display-block" loading="lazy">
-                     </a>
+                    ` : '' }
                 </div>
-            ` : ''}
 
-            <div class="px-4 pt-3 pb-1 border-t flex items-center justify-between text-sm text-muted-foreground">
-               <div class="flex space-x-4">
-                  <span class="like-count-display">${post.like_count} ${post.like_count == 1 ? 'Like' : 'Likes'}</span>
-                  <span class="comment-count-display">${post.comment_count} ${post.comment_count == 1 ? 'Comment' : 'Comments'}</span>
-               </div>
-            </div>
+                <div class="post-content-area px-4 ${ post.content ? 'pb-4' : 'pb-1'}">
+                   ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${nl2br(escapeHtml(post.content))}</div>` : ''}
+                   ${ isAuthor ? `
+                       <form class="post-edit-form hidden mt-2" data-post-id="${post.post_id}">
+                           <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
+                           <div class="flex justify-end items-center space-x-2 mt-2">
+                               <span class="edit-status text-xs text-muted-foreground"></span>
+                               <button type="button" class="edit-cancel-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
+                               <button type="submit" class="edit-save-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Save Changes</button>
+                           </div>
+                       </form>
+                       ` : '' }
+                </div>
 
-             <div class="p-2 border-t grid grid-cols-2 gap-1">
-                   <button data-post-id="${post.post_id}" aria-label="${likeButtonAriaLabel} post" aria-pressed="${likeButtonAriaPressed}" class="${likeButtonClasses}" ${likeButtonDisabled}>
-                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="like-icon-outline w-5 h-5" style="${outlineIconStyle}"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="like-icon-filled w-5 h-5" style="${filledIconStyle}"><path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" /></svg>
-                       <span>Like <span class="like-count font-normal">${post.like_count}</span></span>
-                   </button>
-                   <button data-post-id="${post.post_id}" aria-expanded="false" aria-controls="comment-section-${post.post_id}" class="${commentButtonClasses}" ${commentButtonDisabled}>
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
-                      <span>Comment</span>
-                  </button>
-             </div>
-             <div id="comment-section-${post.post_id}" class="comment-section border-t px-4 py-3 space-y-3 hidden">
-                   <div class="comment-list space-y-3 text-sm">
-                       <p class="text-muted-foreground text-xs loading-comments">Loading comments...</p>
+                ${ postImageSrc ? `
+                    <div class="post-display-image bg-muted border-t dark:border-gray-700 max-h-[60vh] overflow-hidden">
+                         <a href="${postImageSrc}" target="_blank" rel="noopener noreferrer" title="View full image">
+                              <img src="${postImageSrc}" alt="Post image" class="w-full h-auto object-contain display-block" loading="lazy">
+                         </a>
+                    </div>
+                ` : ''}
+
+                <div class="px-4 pt-3 pb-1 border-t flex items-center justify-between text-sm text-muted-foreground">
+                   <div class="flex space-x-4">
+                      <span class="like-count-display">${post.like_count} ${post.like_count == 1 ? 'Like' : 'Likes'}</span>
+                      <span class="comment-count-display">${post.comment_count} ${post.comment_count == 1 ? 'Comment' : 'Comments'}</span>
                    </div>
-                   ${isLoggedIn ? `
-                   <form class="add-comment-form flex items-start space-x-2 pt-3" data-post-id="${post.post_id}">
-                       <img src="${currentUserPicSrc}" alt="Your profile picture" class="w-8 h-8 rounded-full border bg-muted flex-shrink-0 mt-1">
-                       <div class="flex-grow">
-                           <textarea name="content" rows="1" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm" placeholder="Add a comment..."></textarea>
-                           <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 mt-1 float-right">Post</button>
+                </div>
+
+                 <div class="p-2 border-t grid grid-cols-2 gap-1">
+                       <button data-post-id="${post.post_id}" aria-label="${likeButtonAriaLabel} post" aria-pressed="${likeButtonAriaPressed}" class="${likeButtonClasses}" ${likeButtonDisabled}>
+                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="like-icon-outline w-5 h-5" style="${outlineIconStyle}"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="like-icon-filled w-5 h-5" style="${filledIconStyle}"><path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" /></svg>
+                           <span>Like <span class="like-count font-normal">${post.like_count}</span></span>
+                       </button>
+                       <button data-post-id="${post.post_id}" aria-expanded="false" aria-controls="comment-section-${post.post_id}" class="${commentButtonClasses}" ${commentButtonDisabled}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
+                          <span>Comment</span>
+                      </button>
+                 </div>
+                 <div id="comment-section-${post.post_id}" class="comment-section border-t px-4 py-3 space-y-3 hidden">
+                       <div class="comment-list space-y-3 text-sm">
+                           <p class="text-muted-foreground text-xs loading-comments">Loading comments...</p>
                        </div>
-                   </form>
-                   ` : ''}
-             </div>
+                       ${isLoggedIn ? `
+                       <form class="add-comment-form flex items-start space-x-2 pt-3" data-post-id="${post.post_id}">
+                           <img src="${currentUserPicSrc}" alt="Your profile picture" class="w-8 h-8 rounded-full border bg-muted flex-shrink-0 mt-1">
+                           <div class="flex-grow">
+                               <textarea name="content" rows="1" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm" placeholder="Add a comment..."></textarea>
+                               <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 mt-1 float-right">Post</button>
+                           </div>
+                       </form>
+                       ` : ''}
+                 </div>
+            </article>
         `;
+        return postHtml;
+    }).join('');
 
-        feedPostsContainer.appendChild(postElement);
-        setTimeout(() => { postElement.classList.remove('opacity-0'); }, 50);
-    });
+    if (replace) {
+        feedPostsContainer.innerHTML = postsHtml;
+    } else {
+        const tempContainer = document.createElement('div');
+        tempContainer.innerHTML = postsHtml;
+        Array.from(tempContainer.children).forEach(newPostElement => {
+            feedPostsContainer.appendChild(newPostElement);
+            // Use requestAnimationFrame for smoother fade-in trigger
+            requestAnimationFrame(() => {
+                 requestAnimationFrame(() => { // Double requestAnimationFrame for better browser rendering consistency
+                     newPostElement.classList.remove('opacity-0');
+                 });
+            });
+        });
+    }
 
+    // Re-initialize listeners for the potentially new content
     initializeLikeButtons();
     initializeComments();
     initializePostOptions();
@@ -1355,6 +1408,7 @@ const loadMorePosts = async () => {
 
     // Calculate the offset based on the *current* number of posts displayed
     const currentPostCount = feedPostsContainer.querySelectorAll('article[data-post-container-id]').length;
+    await fetchAndRenderFeedPage(currentPostCount, postsPerLoad, false);
     const offsetToLoad = currentPostCount; // Next offset is the current count
 
     console.log(`Loading more posts... Offset: ${offsetToLoad}, Limit: ${postsPerLoad}`);
@@ -1452,18 +1506,74 @@ const initializeInfiniteScroll = () => {
      }
 };
 
-// --- Update DOMContentLoaded Listener ---
+const initialFeedContainer = document.getElementById('feed-posts-container');
+
+const loadInitialPosts = async () => {
+    if (!initialFeedContainer) return;
+
+    const initialStatus = initialFeedContainer.querySelector('.initial-load-status');
+    const skeletonPosts = initialFeedContainer.querySelectorAll('.animate-pulse'); // Select skeletons
+
+    // Check if skeletons are present (meaning PHP didn't render posts)
+    if (skeletonPosts.length === 0) {
+         console.log("Initial posts already rendered by PHP or container empty, skipping initial AJAX load.");
+         initializeInfiniteScroll(); // Still initialize infinite scroll based on existing content
+         return;
+    }
+
+    if (initialStatus) initialStatus.classList.remove('hidden'); // Show "Loading posts..." text
+    console.log("Fetching initial posts...");
+
+    try {
+         // Fetch first page (offset 0)
+         const response = await fetch(`${APP_BASE_URL}/?ajax=1&offset=0&limit=${postsPerLoad}`);
+         const data = await response.json();
+
+         if (!response.ok || !data.success) {
+             throw new Error(data.message || 'Failed to load initial posts');
+         }
+
+         // --- Remove Skeletons & Render Posts ---
+         skeletonPosts.forEach(sk => sk.remove()); // Remove all skeleton elements
+         if (initialStatus) initialStatus.remove(); // Remove loading text
+
+         if (data.posts && data.posts.length > 0) {
+             renderMorePosts(data.posts); // Use the same function to render and attach listeners
+             // If fewer posts than limit returned, no more posts exist
+             if (data.posts.length < postsPerLoad) {
+                 noMorePosts = true;
+                 loadingIndicator.innerHTML = '<p class="text-muted-foreground text-sm py-4">End of feed.</p>';
+                 loadingIndicator.style.display = 'block';
+             }
+         } else {
+             // API returned success but no posts
+             initialFeedContainer.innerHTML = '<p class="text-center text-muted-foreground py-10">No posts found.</p>';
+             noMorePosts = true; // Set flag as there are no posts at all
+         }
+
+    } catch (error) {
+         console.error("Error loading initial posts:", error);
+         if (initialFeedContainer) initialFeedContainer.innerHTML = `<p class="text-center text-destructive py-10">Error loading feed. Please try refreshing.</p>`;
+         noMorePosts = true; // Stop infinite scroll on initial load error
+    } finally {
+        // Initialize infinite scroll AFTER initial load completes or fails
+        initializeInfiniteScroll();
+    }
+};
+
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired.");
     initializeTheme();
     initializeLikeButtons();
     initializeComments();
-    initializeFollowButtons();
+    initializeFollowButtons(); // For buttons outside modal
     initializePostOptions();
     initializeNotifications();
     initializeSearch();
     initializeAiFeatures();
-    initializeInfiniteScroll(); // Make sure this is called
+    // initializeInfiniteScroll(); // Called by loadInitialPosts now
+    loadInitialPosts();
 });
 
-// ... (rest of console log) ...
+console.log('Bailanysta app.js script parsed.');
