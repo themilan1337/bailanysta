@@ -1,0 +1,26 @@
+{
+  "name": "bailanysta",
+  "version": "1.0.0",
+  "main": "vite.config.mjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/themilan1337/bailanysta.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/themilan1337/bailanysta/issues"
+  },
+  "homepage": "https://github.com/themilan1337/bailanysta#readme",
+  "description": "",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.5",
+    "tailwindcss": "^4.1.5",
+    "vite": "^6.3.4"
+  }
+}
