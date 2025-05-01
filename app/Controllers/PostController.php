@@ -137,53 +137,41 @@ class PostController
     {
         header('Content-Type: application/json');
 
-        // 1. Check Auth
-        if ($this->currentUserId === null) {
-            http_response_code(401); echo json_encode(['success' => false, 'message' => 'Authentication required.']); exit;
-        }
-        // 2. Check DB
-        if ($this->db === null) {
-            http_response_code(500); echo json_encode(['success' => false, 'message' => 'Database connection error.']); exit;
-        }
+        if ($this->currentUserId === null) { http_response_code(401); echo json_encode(['success' => false, 'message' => 'Authentication required.']); exit; }
+        if ($this->db === null) { http_response_code(500); echo json_encode(['success' => false, 'message' => 'Database connection error.']); exit; }
 
-        // 3. Get Input Data
+        // Get Input Data from JSON body
         $requestBody = file_get_contents('php://input');
         $data = json_decode($requestBody, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-             if(!empty(trim($requestBody))) { error_log("Failed JSON decode for update: " . json_last_error_msg()); }
-             http_response_code(400); echo json_encode(['success' => false, 'message' => 'Invalid request format.']); exit;
-         }
+        if (json_last_error() !== JSON_ERROR_NONE) { if(!empty(trim($requestBody))) { error_log("Failed JSON decode for update: " . json_last_error_msg()); } http_response_code(400); echo json_encode(['success' => false, 'message' => 'Invalid request format.']); exit; }
+
         $newContent = trim($data['content'] ?? '');
 
-        // 4. Validate Input
-        if (empty($newContent)) {
-            http_response_code(400); echo json_encode(['success' => false, 'message' => 'Post content cannot be empty.']); exit;
-        }
-        if (strlen($newContent) > 65535) { // Match TEXT column limit (adjust if different)
-             http_response_code(400); echo json_encode(['success' => false, 'message' => 'Post content is too long.']); exit;
-        }
+        // Validate Input
+        if (empty($newContent)) { http_response_code(400); echo json_encode(['success' => false, 'message' => 'Post content cannot be empty.']); exit; }
+        if (strlen($newContent) > 65535) { http_response_code(400); echo json_encode(['success' => false, 'message' => 'Post content is too long.']); exit; }
 
-        // 5. Verify Ownership and Update
+        // Sanitize text content (Use basic sanitization if not using HTMLPurifier)
+        $sanitizedContent = htmlspecialchars($newContent); // Basic escaping
+
+        // Verify Ownership and Update Content
         try {
-            // Fetch the post first to check ownership
             $stmt = $this->db->prepare("SELECT user_id FROM posts WHERE id = :post_id");
             $stmt->bindParam(':post_id', $id, PDO::PARAM_INT);
             $stmt->execute();
             $post = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$post) {
-                 http_response_code(404); echo json_encode(['success' => false, 'message' => 'Post not found.']); exit;
-            }
+            if (!$post) { http_response_code(404); echo json_encode(['success' => false, 'message' => 'Post not found.']); exit; }
+            if ($post['user_id'] !== $this->currentUserId) { http_response_code(403); echo json_encode(['success' => false, 'message' => 'You are not authorized to edit this post.']); exit; }
 
-            if ($post['user_id'] !== $this->currentUserId) {
-                 http_response_code(403); echo json_encode(['success' => false, 'message' => 'You are not authorized to edit this post.']); exit;
-            }
-
-            // Proceed with update
-            $updateStmt = $this->db->prepare("UPDATE posts SET content = :content, updated_at = NOW() WHERE id = :post_id AND user_id = :user_id");
-            $updateStmt->bindParam(':content', $newContent, PDO::PARAM_STR); // TODO: Sanitize if allowing HTML
+            // Update ONLY content and updated_at
+            $updateStmt = $this->db->prepare(
+                "UPDATE posts SET content = :content, updated_at = NOW()
+                 WHERE id = :post_id AND user_id = :user_id"
+            );
+            $updateStmt->bindParam(':content', $sanitizedContent, PDO::PARAM_STR);
             $updateStmt->bindParam(':post_id', $id, PDO::PARAM_INT);
-            $updateStmt->bindParam(':user_id', $this->currentUserId, PDO::PARAM_INT); // Ensure user_id matches just in case
+            $updateStmt->bindParam(':user_id', $this->currentUserId, PDO::PARAM_INT);
             $success = $updateStmt->execute();
 
             if ($success) {
@@ -191,25 +179,18 @@ class PostController
                  echo json_encode([
                      'success' => true,
                      'message' => 'Post updated successfully.',
-                     // Send back the updated content (after potential sanitization if any)
-                     // Basic escaping for now, replace with proper sanitizer if needed later
-                     'newContentHtml' => nl2br(htmlspecialchars($newContent))
+                     // Return new content formatted with line breaks
+                     'newContentHtml' => nl2br($sanitizedContent)
                  ]);
             } else {
-                 // This might indicate a DB error not caught by PDOException
                  http_response_code(500);
                  echo json_encode(['success' => false, 'message' => 'Failed to update post in database.']);
             }
 
-        } catch (PDOException $e) {
-            error_log("PDO Error updating post {$id}: " . $e->getMessage());
-            http_response_code(500);
-            $errMsg = APP_ENV === 'development' ? $e->getMessage() : 'Database error during post update.';
-            echo json_encode(['success' => false, 'message' => $errMsg]);
         } catch (Throwable $e) {
-            error_log("General Error updating post {$id}: " . $e->getMessage());
+            error_log("Error updating post {$id}: " . $e->getMessage());
             http_response_code(500);
-            $errMsg = APP_ENV === 'development' ? $e->getMessage() : 'An unexpected error occurred.';
+            $errMsg = APP_ENV === 'development' ? 'Error: ' . $e->getMessage() : 'Error updating post.';
             echo json_encode(['success' => false, 'message' => $errMsg]);
         }
         exit;

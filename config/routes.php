@@ -59,3 +59,7 @@ $r->addRoute('POST', '/api/notifications/mark-read', [NotificationController::cl
 $r->addRoute('GET', '/api/posts/search', [FeedController::class, 'search']);
 
 $r->addRoute('POST', '/api/ai/generate-post-idea', [AiController::class, 'generatePostIdea']);
+
+$r->addRoute('GET', '/api/users/{userId:\d+}/followers', [UserController::class, 'getFollowers']);
+// Get list of users the specified user is following
+$r->addRoute('GET', '/api/users/{userId:\d+}/following', [UserController::class, 'getFollowing']);

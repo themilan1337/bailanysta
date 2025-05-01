@@ -43,6 +43,69 @@ class UserController
          $this->handleFollowUnfollow($userId, false); // <-- Pass $userId
     }
 
+    public function getFollowers(int $userId): void
+    {
+        $this->fetchFollowList($userId, 'followers');
+    }
+
+    public function getFollowing(int $userId): void
+    {
+        $this->fetchFollowList($userId, 'following');
+    }
+
+    private function fetchFollowList(int $userId, string $type): void
+    {
+        header('Content-Type: application/json');
+        if ($this->db === null) {
+            http_response_code(500); echo json_encode(['success' => false, 'message' => 'DB error.', 'users' => []]); exit;
+        }
+
+        // Determine which column to join on based on type
+        $joinColumn = ($type === 'followers') ? 'f.follower_id' : 'f.following_id';
+        $whereColumn = ($type === 'followers') ? 'f.following_id' : 'f.follower_id';
+
+        try {
+             // Select basic user info of the followers/following
+             // Also check if the *current logged-in user* is following *each person* in the list
+             $sql = "SELECT
+                        u.id, u.name, u.nickname, u.picture_url";
+
+             if ($this->currentUserId !== null) {
+                 $sql .= ", (SELECT COUNT(*) FROM follows f_check
+                            WHERE f_check.follower_id = :current_user_id AND f_check.following_id = u.id) > 0 AS viewer_is_following";
+             } else {
+                 $sql .= ", 0 AS viewer_is_following"; // Default if not logged in
+             }
+
+             $sql .= " FROM users u
+                      JOIN follows f ON u.id = {$joinColumn}
+                      WHERE {$whereColumn} = :target_user_id
+                      ORDER BY f.created_at DESC"; // Show newest first, or order by name: ORDER BY u.name ASC
+
+             $stmt = $this->db->prepare($sql);
+             $stmt->bindParam(':target_user_id', $userId, PDO::PARAM_INT);
+              if ($this->currentUserId !== null) {
+                 $stmt->bindParam(':current_user_id', $this->currentUserId, PDO::PARAM_INT);
+             }
+             $stmt->execute();
+             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+             // Ensure boolean type
+             foreach($users as &$user) {
+                 $user['viewer_is_following'] = (bool)$user['viewer_is_following'];
+             }
+             unset($user);
+
+             echo json_encode(['success' => true, 'users' => $users]);
+
+        } catch (Throwable $e) {
+             error_log("Error fetching {$type} for user {$userId}: " . $e->getMessage());
+             http_response_code(500);
+             echo json_encode(['success' => false, 'message' => "Error fetching {$type}.", 'users' => []]);
+        }
+        exit;
+    }
+
 
     /**
      * Shared logic for follow/unfollow actions.

@@ -47,8 +47,12 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
             <?php endif; ?>
 
             <div class="flex items-center justify-center sm:justify-start space-x-4 mt-2 text-sm">
-                <span class="text-muted-foreground"><strong class="text-foreground"><?php echo $user['follower_count'] ?? 0; ?></strong> Followers</span>
-                <span class="text-muted-foreground"><strong class="text-foreground"><?php echo $user['following_count'] ?? 0; ?></strong> Following</span>
+                <button type="button" data-list-type="followers" data-user-id="<?php echo $user['id']; ?>" class="show-follow-list-button text-muted-foreground hover:text-primary hover:underline focus:outline-none">
+                    <strong class="text-foreground"><?php echo $user['follower_count'] ?? 0; ?></strong> Followers
+                </button>
+                <button type="button" data-list-type="following" data-user-id="<?php echo $user['id']; ?>" class="show-follow-list-button text-muted-foreground hover:text-primary hover:underline focus:outline-none">
+                    <strong class="text-foreground"><?php echo $user['following_count'] ?? 0; ?></strong> Following
+                </button>
             </div>
 
             <p class="text-muted-foreground text-xs mt-1 text-center sm:text-left">Joined: <?php echo date('M j, Y', strtotime($user['created_at'])); ?></p>
@@ -111,6 +115,17 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
              </form>
         </div>
 
+        <div class="bg-card border border-destructive/50 rounded-lg shadow-sm p-6">
+            <h2 class="text-xl font-semibold mb-3 text-destructive">Danger Zone</h2>
+            <p class="text-sm text-muted-foreground mb-4">Deleting your account is permanent and cannot be undone. All your posts, comments, likes, and follower information will be lost.</p>
+            <form action="<?php echo BASE_URL; ?>/profile/delete" method="POST" onsubmit="return confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.');">
+                 <button type="submit"
+                         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4">
+                     Delete My Account Permanently
+                 </button>
+            </form>
+         </div>
+
         <div>
            <h2 class="text-xl font-semibold mb-4 text-foreground">Your Posts</h2>
            <?php if (empty($posts)): ?>
@@ -126,16 +141,7 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
            <?php endif; ?>
         </div>
 
-         <div class="bg-card border border-destructive/50 rounded-lg shadow-sm p-6">
-            <h2 class="text-xl font-semibold mb-3 text-destructive">Danger Zone</h2>
-            <p class="text-sm text-muted-foreground mb-4">Deleting your account is permanent and cannot be undone. All your posts, comments, likes, and follower information will be lost.</p>
-            <form action="<?php echo BASE_URL; ?>/profile/delete" method="POST" onsubmit="return confirm('Are you absolutely sure you want to delete your account? This action cannot be undone.');">
-                 <button type="submit"
-                         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4">
-                     Delete My Account Permanently
-                 </button>
-            </form>
-         </div>
+
 
     <?php else: ?>
         <div>
@@ -156,4 +162,29 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Need
         </div>
     <?php endif; ?>
 
+</div>
+
+<div id="follow-list-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm" aria-labelledby="follow-list-modal-title" role="dialog" aria-modal="true">
+  <div class="relative w-full max-w-md transform overflow-hidden rounded-lg bg-card text-left shadow-xl transition-all sm:my-8">
+     <div class="border-b p-4">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold leading-6 text-foreground" id="follow-list-modal-title">List Title</h3>
+            <button type="button" id="close-follow-modal-button" class="rounded-md p-1 text-muted-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                <span class="sr-only">Close</span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+     </div>
+     <div class="max-h-[60vh] overflow-y-auto p-4">
+     <div id="follow-list-content" class="space-y-3">
+        <div class="loading-follow-list flex justify-center items-center py-6 text-muted-foreground">
+              <svg class="animate-spin h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Loading Users...</span>
+        </div>
+    </div>
+     </div>
+  </div>
 </div>

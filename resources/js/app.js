@@ -164,29 +164,42 @@ function nl2br(str) {
             };
             const loadComments = async (postId, commentSection) => {
                 const commentList = commentSection.querySelector('.comment-list');
-                const loadingIndicator = commentSection.querySelector('.loading-comments');
+                const loadingIndicator = commentSection.querySelector('.loading-comments'); // Now targets the div
+            
                 if (!commentList || !loadingIndicator) return;
-                loadingIndicator.style.display = 'block';
-                commentList.innerHTML = '';
-                commentList.appendChild(loadingIndicator);
+            
+                loadingIndicator.style.display = 'flex'; // Show spinner div
+                // Clear previous comments *except* the loading indicator itself
+                commentList.querySelectorAll('.comment-item, .no-comments, .text-destructive').forEach(el => el.remove());
+            
                 try {
                     const response = await fetch(`/api/posts/${postId}/comments`);
                     const data = await response.json();
-                    loadingIndicator.style.display = 'none';
+            
                     if (!response.ok || !data.success) {
-                        console.error('Failed to load comments:', data.message || `HTTP ${response.status}`);
-                        commentList.innerHTML = '<p class="text-destructive text-xs">Could not load comments.</p>';
+                        console.error('Failed load comments:', data.message || `HTTP ${response.status}`);
+                        const errorP = document.createElement('p');
+                        errorP.className = 'text-destructive text-xs text-center py-3';
+                        errorP.textContent = 'Could not load comments.';
+                        commentList.appendChild(errorP);
                     } else if (data.comments && data.comments.length > 0) {
                         data.comments.forEach(comment => {
                             commentList.appendChild(createCommentElement(comment));
                         });
                     } else {
-                        commentList.innerHTML = '<p class="text-muted-foreground text-xs no-comments">No comments yet.</p>';
+                         const noCommentsP = document.createElement('p');
+                         noCommentsP.className = 'text-muted-foreground text-xs text-center py-3 no-comments';
+                         noCommentsP.textContent = 'No comments yet.';
+                         commentList.appendChild(noCommentsP);
                     }
                 } catch (error) {
                     console.error('Network error loading comments:', error);
-                    loadingIndicator.style.display = 'none';
-                    commentList.innerHTML = '<p class="text-destructive text-xs">Error loading comments.</p>';
+                     const errorP = document.createElement('p');
+                     errorP.className = 'text-destructive text-xs text-center py-3';
+                     errorP.textContent = 'Error loading comments.';
+                     commentList.appendChild(errorP);
+                } finally {
+                     loadingIndicator.style.display = 'none'; // Hide spinner div when done
                 }
             };
             const handleCommentToggle = (event) => {
@@ -389,61 +402,69 @@ function nl2br(str) {
                 const form = event.currentTarget;
                 const postId = form.dataset.postId;
                 const textarea = form.querySelector('textarea[name="content"]');
+                // No imageInput or removeCheckbox needed here anymore
                 const saveButton = form.querySelector('.edit-save-button');
                 const cancelButton = form.querySelector('.edit-cancel-button');
                 const statusSpan = form.querySelector('.edit-status');
                 const postContainer = form.closest('article[data-post-container-id]');
                 const displayContent = postContainer?.querySelector('.post-display-content');
+            
                 if (!postId || !textarea || !saveButton || !cancelButton || !postContainer || !displayContent || !statusSpan) {
                     console.error("Missing elements for edit save.");
                     return;
                 }
+            
                 const newContent = textarea.value.trim();
+                // Validation only needs to check text content now
                 if (newContent === '') {
+                    // Using alert as we reverted toast notifications
                     alert('Post content cannot be empty.');
                     textarea.focus();
                     return;
                 }
-                saveButton.disabled = true;
-                cancelButton.disabled = true;
-                textarea.disabled = true;
-                statusSpan.textContent = 'Saving...';
-                statusSpan.classList.remove('text-destructive');
+            
+                saveButton.disabled = true; cancelButton.disabled = true; textarea.disabled = true;
+                statusSpan.textContent = 'Saving...'; statusSpan.classList.remove('text-destructive');
+            
+                // --- Send JSON, not FormData ---
+                const payload = { content: newContent };
+            
                 try {
                     const response = await fetch(`/api/posts/${postId}/update`, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
+                            'Content-Type': 'application/json', // Set Content-Type for JSON
+                            'Accept': 'application/json',
                         },
-                        body: JSON.stringify({
-                            content: newContent
-                        })
+                        body: JSON.stringify(payload) // Send JSON string
                     });
-                    const data = await response.json();
+                    const data = await response.json(); // Expect JSON response
+            
                     if (!response.ok || !data.success) {
-                        console.error('Failed to update post:', data.message || `HTTP ${response.status}`);
-                        statusSpan.textContent = `Error: ${data.message || 'Could not save.'}`;
-                        statusSpan.classList.add('text-destructive');
-                        saveButton.disabled = false;
-                        cancelButton.disabled = false;
-                        textarea.disabled = false;
+                         console.error('Update post error:', data.message || `HTTP ${response.status}`);
+                         statusSpan.textContent = `Error: ${data.message || 'Could not save.'}`;
+                         statusSpan.classList.add('text-destructive');
+                         // Re-enable form on error
+                         saveButton.disabled = false; cancelButton.disabled = false; textarea.disabled = false;
                     } else {
-                        displayContent.innerHTML = data.newContentHtml || nl2br(escapeHtml(newContent));
+                        // --- Update UI (Text Only) ---
+                        displayContent.innerHTML = data.newContentHtml || nl2br(escapeHtml(newContent)); // Use response HTML (nl2br for plain text)
                         statusSpan.textContent = '';
-                        toggleEditState(postContainer, false);
-                        saveButton.disabled = false;
-                        cancelButton.disabled = false;
-                        textarea.disabled = false;
+                        toggleEditState(postContainer, false); // Hide edit form
+                         // Re-enable buttons after hiding
+                         saveButton.disabled = false; cancelButton.disabled = false; textarea.disabled = false;
+                         // alert('Post updated successfully!'); // Reverted alert
                     }
-                } catch (error) {
+            
+                } catch(error) {
                     console.error('Network error updating post:', error);
                     statusSpan.textContent = 'Network error.';
                     statusSpan.classList.add('text-destructive');
-                    saveButton.disabled = false;
-                    cancelButton.disabled = false;
-                    textarea.disabled = false;
+                     alert('Network error saving post.'); // Reverted alert
+                    // Re-enable form on error
+                    saveButton.disabled = false; cancelButton.disabled = false; textarea.disabled = false;
                 }
+                // No finally block needed for this simplified version
             };
             const handleDeleteButtonClick = async (event) => {
                 const button = event.currentTarget;
@@ -1033,17 +1054,167 @@ function nl2br(str) {
             };
             
             
-            // --- Update DOMContentLoaded Listener ---
-            document.addEventListener('DOMContentLoaded', () => {
-                console.log("DOMContentLoaded event fired.");
-                initializeTheme();
-                initializeLikeButtons();
-                initializeComments();
-                initializeFollowButtons();
-                initializePostOptions();
-                initializeNotifications();
-                initializeSearch();
-                initializeAiFeatures(); // <-- Add this call
-            });
-            
-            console.log('Bailanysta app.js script parsed (Includes AI Features).');
+            const followListModal = document.getElementById('follow-list-modal');
+const followListTitle = document.getElementById('follow-list-modal-title');
+const followListContent = document.getElementById('follow-list-content');
+const closeFollowModalButton = document.getElementById('close-follow-modal-button');
+// const notificationDropdownContainer = document.getElementById('notification-dropdown-container'); // Already defined if needed
+
+/**
+ * Renders the list of users inside the modal.
+ */
+const renderFollowList = (users, listType) => {
+    if (!followListContent || !followListTitle) return;
+    followListTitle.textContent = listType.charAt(0).toUpperCase() + listType.slice(1); // Capitalize type
+
+    if (!users || users.length === 0) {
+        followListContent.innerHTML = `<p class="text-center text-muted-foreground py-4">No users found.</p>`;
+        return;
+    }
+
+    const currentUserId = typeof CURRENT_USER_ID !== 'undefined' ? CURRENT_USER_ID : null;
+
+    followListContent.innerHTML = users.map(user => {
+        const isFollowingThisUser = user.viewer_is_following;
+        const isSelf = currentUserId === user.id;
+        let followButtonHtml = '';
+
+        if (currentUserId !== null && !isSelf) {
+             const buttonClasses = `follow-toggle-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-7 px-2 ${isFollowingThisUser ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`;
+             const buttonText = isFollowingThisUser ? 'Following' : 'Follow';
+             const ariaPressed = isFollowingThisUser ? 'true' : 'false';
+             followButtonHtml = `<button type="button" data-user-id="${user.id}" class="${buttonClasses}" aria-pressed="${ariaPressed}"><span class="follow-text">${buttonText}</span></button>`;
+        }
+
+        return `
+            <div class="flex items-center justify-between space-x-3 py-1.5">
+                <a href="${APP_BASE_URL}/profile/${user.id}" class="flex items-center space-x-2 min-w-0 group">
+                    <img src="${escapeHtml(user.picture_url || 'https://via.placeholder.com/40/cccccc/969696?text=')}" alt="${escapeHtml(user.name)}'s picture" class="w-9 h-9 rounded-full border bg-muted flex-shrink-0 group-hover:opacity-80">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-foreground truncate group-hover:underline">${escapeHtml(user.name)}</p>
+                        ${user.nickname ? `<p class="text-xs text-muted-foreground truncate">@${escapeHtml(user.nickname)}</p>` : ''}
+                    </div>
+                </a>
+                <div class="flex-shrink-0 ml-auto">
+                    ${followButtonHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    initializeFollowButtonsInModal(followListContent); // Re-attach listeners for buttons inside modal
+};
+
+/**
+ * Fetch and display the follower or following list.
+ */
+const showFollowList = async (event) => {
+    const button = event.currentTarget;
+    const userId = button.dataset.userId;
+    const listType = button.dataset.listType;
+
+    if (!userId || !listType || !followListModal || !followListContent || !followListTitle) return;
+
+    followListModal.classList.remove('hidden');
+    followListModal.classList.add('flex');
+    followListTitle.textContent = `Loading ${listType}...`;
+    followListContent.innerHTML = `
+        <div class="loading-follow-list flex justify-center items-center py-6 text-muted-foreground">
+              <svg class="animate-spin h-6 w-6 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Loading Users...</span>
+        </div>`;
+
+    try {
+        const apiUrl = `/api/users/${userId}/${listType}`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || `Failed to load ${listType}`);
+        }
+        renderFollowList(data.users, listType);
+
+    } catch (error) {
+         console.error(`Error fetching ${listType}:`, error);
+         followListContent.innerHTML = `<p class="text-center text-destructive py-4">Error loading list.</p>`;
+         followListTitle.textContent = 'Error';
+    }
+};
+
+/**
+ * Close the follow list modal.
+ */
+const closeFollowListModal = () => {
+    if (followListModal) {
+        followListModal.classList.add('hidden');
+        followListModal.classList.remove('flex');
+    }
+};
+
+/**
+ * Initialize listeners specifically for follow buttons inside the modal.
+ * Important because modal content is dynamic.
+ */
+const initializeFollowButtonsInModal = (container) => {
+    if (!container) return;
+    container.querySelectorAll('.follow-toggle-button').forEach(button => {
+         button.removeEventListener('click', handleFollowToggle); // Prevent duplicates
+         if (!button.disabled) { // Check if not disabled (shouldn't be in modal unless logged out state is wrong)
+             button.addEventListener('click', handleFollowToggle);
+         }
+     });
+      console.log("Follow buttons within modal initialized.");
+};
+
+
+/**
+ * Initialize listeners for showing the follow list modal.
+ */
+const initializeFollowListTriggers = () => {
+     if(!followListModal) return; // Don't initialize if modal isn't present
+
+     console.log("Initializing follow list triggers...");
+     document.querySelectorAll('.show-follow-list-button').forEach(button => {
+         button.removeEventListener('click', showFollowList);
+         button.addEventListener('click', showFollowList);
+     });
+
+     if (closeFollowModalButton) {
+          closeFollowModalButton.removeEventListener('click', closeFollowListModal);
+          closeFollowModalButton.addEventListener('click', closeFollowListModal);
+     }
+
+     document.addEventListener('keydown', (event) => {
+         if (event.key === "Escape" && !followListModal.classList.contains('hidden')) {
+             closeFollowListModal();
+         }
+     });
+
+    // Optional: Close on backdrop click
+    // followListModal.addEventListener('click', (event) => {
+    //      if (event.target === followListModal) { closeFollowListModal(); }
+    //  });
+
+
+      console.log("Follow list trigger listeners attached.");
+};
+
+
+// --- Update DOMContentLoaded Listener ---
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOMContentLoaded event fired.");
+    initializeTheme();
+    initializeLikeButtons();
+    initializeComments();
+    initializeFollowButtons(); // For buttons outside modal
+    initializePostOptions();
+    initializeNotifications();
+    initializeSearch();
+    initializeAiFeatures();
+    initializeFollowListTriggers(); // <-- Initialize modal triggers
+});
+
+// ... (rest of console log) ...
