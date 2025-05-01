@@ -211,26 +211,87 @@ class ProfileController
             header('Location: ' . BASE_URL . '/profile'); exit;
         }
         $content = trim($_POST['content'] ?? '');
-        if (empty($content)) {
-            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Post content cannot be empty.'];
-             // Redirect back to profile when posting fails from profile
-            header('Location: ' . BASE_URL . '/profile');
-            exit;
+        $uploadedImage = $_FILES['post_image'] ?? null; // Check for uploaded file
+        $imageUrl = null; // Initialize image URL
+
+        if (empty($content) && (empty($uploadedImage) || $uploadedImage['error'] == UPLOAD_ERR_NO_FILE)) {
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Post content or image is required.'];
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
         }
+
+        // --- Handle Image Upload ---
+        if ($uploadedImage && $uploadedImage['error'] === UPLOAD_ERR_OK) {
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            $maxSize = 2 * 1024 * 1024; // 2 MB
+
+            // Basic Validation
+            if (!in_array($uploadedImage['type'], $allowedTypes)) {
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Invalid image type. Allowed: JPG, PNG, GIF, WEBP.'];
+                header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
+            }
+            if ($uploadedImage['size'] > $maxSize) {
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Image file size exceeds the 2MB limit.'];
+                header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
+            }
+
+            // Generate unique filename
+            $extension = pathinfo($uploadedImage['name'], PATHINFO_EXTENSION);
+            $safeExtension = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $extension)); // Sanitize extension
+            if (!in_array('image/'.$safeExtension, $allowedTypes) && !($safeExtension === 'jpg' && in_array('image/jpeg', $allowedTypes))) { // Extra check on extension
+                $safeExtension = 'jpg'; // Default to jpg if unsure/unsafe
+            }
+            $filename = uniqid('post_', true) . '.' . $safeExtension;
+            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/posts/'; // Absolute path to storage
+            $destination = $uploadDir . $filename;
+            $publicUrlPath = '/uploads/posts/' . $filename; // Relative URL path for DB/HTML src
+
+            // Ensure directory exists and is writable (basic check)
+            if (!is_dir($uploadDir)) { @mkdir($uploadDir, 0775, true); } // Attempt to create if missing
+            if (!is_writable($uploadDir)) {
+                error_log("Upload directory not writable: " . $uploadDir);
+                $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Server error: Cannot save uploaded image.'];
+                header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
+            }
+
+            // Move the uploaded file
+            if (move_uploaded_file($uploadedImage['tmp_name'], $destination)) {
+                $imageUrl = $publicUrlPath; // Set the URL to be saved in DB
+                 error_log("Image uploaded successfully: " . $destination);
+            } else {
+                error_log("Failed to move uploaded file to: " . $destination);
+                 $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Failed to process uploaded image.'];
+                 header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
+            }
+        } elseif ($uploadedImage && $uploadedImage['error'] !== UPLOAD_ERR_NO_FILE) {
+             // Handle other upload errors (permissions, partial upload, etc.)
+             error_log("File upload error code: " . $uploadedImage['error']);
+             $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'An error occurred during file upload. Code: ' . $uploadedImage['error']];
+             header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
+        }
+        // --- End Image Upload Handling ---
+
+
         try {
-            $stmt = $this->db->prepare( "INSERT INTO posts (user_id, content, created_at, updated_at) VALUES (:user_id, :content, NOW(), NOW())" );
-            $stmt->execute([':user_id' => $this->currentUserId, ':content' => $content ]);
+            $stmt = $this->db->prepare(
+                "INSERT INTO posts (user_id, content, image_url, created_at, updated_at)
+                 VALUES (:user_id, :content, :image_url, NOW(), NOW())"
+            );
+            $stmt->execute([
+                ':user_id' => $this->currentUserId,
+                ':content' => $content, // Still use plain text content
+                ':image_url' => $imageUrl // Save the image URL (or NULL if no image)
+            ]);
+
             $_SESSION['flash_message'] = ['type' => 'success', 'text' => 'Post created successfully!'];
-            // --- SIMPLIFIED REDIRECT ---
-            // Always redirect back to the main profile page after success
-            header('Location: ' . BASE_URL . '/');
+            header('Location: ' . BASE_URL . (str_contains($_SERVER['HTTP_REFERER'] ?? '', '/profile') ? '/profile' : '/'));
             exit;
+
         } catch (\PDOException $e) {
             error_log("Error creating post for user {$this->currentUserId}: " . $e->getMessage());
-            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Failed to create post.'];
-             // Redirect back to profile when posting fails from profile
-             header('Location: ' . BASE_URL . '/profile');
-            exit;
+             // Attempt to delete uploaded image if DB insert failed
+             if ($imageUrl && isset($destination) && file_exists($destination)) { @unlink($destination); }
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Failed to save post to database.'];
+            header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . '/profile')); exit;
         }
     }
 }

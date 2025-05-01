@@ -35,18 +35,27 @@ $currentUser = $isLoggedIn ? ($_SESSION['user'] ?? null) : null;
 
     <?php if ($isLoggedIn && $currentUser): ?>
         <div class="bg-card border rounded-lg p-4 mb-6 shadow-sm">
-             <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST">
+            <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST" enctype="multipart/form-data">
                 <h2 class="text-lg font-semibold mb-3 text-foreground">Create a New Post</h2>
-                 <textarea name="content" rows="3"
-                           class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm"
-                           placeholder="What's on your mind, <?php echo htmlspecialchars($currentUser['name']); ?>?"></textarea>
-                 <div class="flex justify-end mt-3">
-                     <button type="submit"
-                             class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3">
-                         Create Post
-                     </button>
-                 </div>
-             </form>
+                <textarea name="content" rows="3"
+                        class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm"
+                        placeholder="What's on your mind, <?php echo htmlspecialchars($currentUser['name']); ?>?"></textarea>
+
+                <div class="mt-2">
+                    <label for="post_image" class="block text-sm font-medium text-muted-foreground mb-1">Attach Image (Optional)</label>
+                    <input type="file" name="post_image" id="post_image"
+                            accept="image/jpeg, image/png, image/gif, image/webp"
+                            class="block w-full text-sm text-muted-foreground border border-input rounded-md cursor-pointer bg-background focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90">
+                    <p class="text-xs text-muted-foreground mt-1">Max file size: 2MB. Allowed types: JPG, PNG, GIF, WEBP.</p>
+                </div>
+
+                <div class="flex justify-end mt-3">
+                    <button type="submit"
+                            class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3">
+                        Create Post
+                    </button>
+                </div>
+            </form>
         </div>
     <?php endif; ?>
 

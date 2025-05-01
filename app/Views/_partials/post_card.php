@@ -34,24 +34,33 @@ $isAuthor = ($currentUserId !== null && isset($post['author_id']) && $currentUse
           <?php endif; ?>
      </div>
 
-    <div class="post-content-area px-4 pb-4">
-        <div class="post-display-content max-w-none dark:text-gray-200">
-             <?php echo $post['content']; // Render sanitized HTML directly ?>
-        </div>
+     <div class="post-content-area px-4 <?php echo !empty($post['content']) ? 'pb-4' : 'pb-1'; // Reduce bottom padding if no text ?>">
+        <?php if (!empty($post['content'])): ?>
+            <div class="post-display-content max-w-none dark:text-gray-200">
+                <?php echo nl2br(htmlspecialchars($post['content'])); // Display plain text with line breaks ?>
+            </div>
+        <?php endif; ?>
         <?php if ($isAuthor): ?>
-        <form class="post-edit-form hidden mt-2" data-post-id="<?php echo $post['post_id']; ?>">
-             <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required><?php echo htmlspecialchars(strip_tags($post['content'])); // Use plain text for textarea ?></textarea>
-             <div class="flex justify-end items-center space-x-2 mt-2">
-                  <span class="edit-status text-xs text-muted-foreground"></span>
-                  <button type="button" class="edit-cancel-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
-                 <button type="submit" class="edit-save-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Save Changes</button>
-             </div>
-        </form>
+            <form class="post-edit-form hidden mt-2" data-post-id="<?php echo $post['post_id']; ?>">
+                <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required><?php echo htmlspecialchars($post['content']); ?></textarea>
+                <div class="flex justify-end items-center space-x-2 mt-2">
+                     <span class="edit-status text-xs text-muted-foreground"></span>
+                     <button type="button" class="edit-cancel-button ...">Cancel</button>
+                    <button type="submit" class="edit-save-button ...">Save Changes</button>
+                </div>
+            </form>
         <?php endif; ?>
     </div>
 
-     <?php if (!empty($post['image_url'])): ?>
-         <div class="bg-muted"><img src="<?php echo htmlspecialchars($post['image_url']); ?>" alt="Post image" class="max-h-96 w-full object-contain mx-auto"></div>
+    <?php if (!empty($post['image_url'])): ?>
+         <div class="bg-muted border-t dark:border-gray-700 max-h-[60vh] overflow-hidden"> <?php // Added max-height and overflow hidden ?>
+              <a href="<?php echo BASE_URL . htmlspecialchars($post['image_url']); ?>" target="_blank" rel="noopener noreferrer" title="View full image"> <?php // Link to full image ?>
+                   <img src="<?php echo BASE_URL . htmlspecialchars($post['image_url']); ?>"
+                        alt="Post image"
+                        class="w-full h-auto object-contain display-block" <?php // Ensure image scales nicely ?>
+                        loading="lazy"> <?php // Lazy load images ?>
+              </a>
+         </div>
      <?php endif; ?>
 
      <div class="px-4 pt-3 pb-1 border-t flex items-center justify-between text-sm text-muted-foreground">
