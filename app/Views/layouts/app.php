@@ -40,10 +40,31 @@ $isLoggedIn = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
                         Feed
                     </a>
 
-                    <?php if ($isLoggedIn): ?>
+                        <?php if ($isLoggedIn): ?>
                         <a href="<?php echo BASE_URL; ?>/profile" class="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-2 sm:px-3 py-2 rounded-md">
                             Profile
                         </a>
+
+                        <?php // --- Notification Dropdown --- ?>
+                        <div class="relative" id="notification-dropdown-container">
+                            <button id="notification-toggle-button" type="button" aria-label="View notifications" class="relative inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.017 5.454 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                                </svg>
+                                <span id="notification-count-badge" class="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full hidden">0</span>
+                            </button>
+                            <div id="notification-list" class="hidden absolute right-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-popover border rounded-md shadow-lg z-20 py-1 text-sm">
+                                <div class="px-3 py-2 font-semibold text-foreground border-b">Notifications</div>
+                                <div id="notification-items-container">
+                                     <p class="p-4 text-muted-foreground text-center text-xs">Loading...</p>
+                                     <?php /* Notification items will be added here by JS */ ?>
+                                </div>
+                                 <div class="p-2 border-t text-center">
+                                     <button id="mark-all-read-button" class="text-xs text-primary hover:underline disabled:opacity-50" disabled>Mark all as read</button>
+                                 </div>
+                            </div>
+                        </div>
+                        <?php // --- End Notification Dropdown --- ?>
 
                         <button id="theme-toggle" type="button" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10">
                             <svg id="theme-toggle-sun-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>

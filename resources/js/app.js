@@ -1,10 +1,5 @@
 // resources/js/app.js
 
-/**
- * Gets a cookie value by name.
- * @param {string} name - The name of the cookie.
- * @returns {string|null} - The cookie value or null if not found.
- */
 function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -12,12 +7,6 @@ function getCookie(name) {
     return null;
 }
 
-/**
- * Sets a cookie.
- * @param {string} name - The name of the cookie.
- * @param {string} value - The value of the cookie.
- * @param {number} days - Number of days until the cookie expires.
- */
 function setCookie(name, value, days) {
     let expires = "";
     if (days) {
@@ -28,194 +17,6 @@ function setCookie(name, value, days) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
 }
 
-
-/**
- * Applies the theme (light/dark) to the HTML element and updates toggle icons.
- * @param {string} theme - 'light' or 'dark'
- */
-const applyTheme = (theme) => {
-    const htmlElement = document.documentElement;
-
-    if (!htmlElement) return; // Guard against running too early
-
-    if (theme === 'dark') {
-        htmlElement.classList.add('dark');
-    } else {
-        htmlElement.classList.remove('dark');
-    }
-
-    // Update icons for logged-in button
-    const sunIcon = document.getElementById('theme-toggle-sun-icon');
-    const moonIcon = document.getElementById('theme-toggle-moon-icon');
-    if (sunIcon && moonIcon) {
-        sunIcon.style.display = theme === 'dark' ? 'none' : 'block';
-        moonIcon.style.display = theme === 'dark' ? 'block' : 'none';
-    }
-
-    // Update icons for logged-out button
-    const sunIconLoggedOut = document.getElementById('theme-toggle-sun-icon-logged-out');
-    const moonIconLoggedOut = document.getElementById('theme-toggle-moon-icon-logged-out');
-     if (sunIconLoggedOut && moonIconLoggedOut) {
-        sunIconLoggedOut.style.display = theme === 'dark' ? 'none' : 'block';
-        moonIconLoggedOut.style.display = theme === 'dark' ? 'block' : 'none';
-    }
-};
-
-/**
- * Toggles the theme, saves to cookie, and applies it visually.
- */
-const toggleTheme = () => {
-    const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    setCookie('ui-theme', newTheme, 365);
-    applyTheme(newTheme);
-};
-
-/**
- * Initializes the theme based on the cookie or defaults to 'light'.
- */
-const initializeTheme = () => {
-    console.log("Attempting to initialize theme..."); // Debug log
-    const savedTheme = getCookie('ui-theme');
-    const initialTheme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
-
-    if (!savedTheme || (savedTheme !== 'dark' && savedTheme !== 'light')) {
-         setCookie('ui-theme', initialTheme, 365);
-    }
-
-    applyTheme(initialTheme);
-
-    // Add event listeners to toggle buttons (safer inside init or DOMContentLoaded)
-    const toggleButton = document.getElementById('theme-toggle');
-    const toggleButtonLoggedOut = document.getElementById('theme-toggle-logged-out');
-
-    if (toggleButton) {
-        toggleButton.removeEventListener('click', toggleTheme); // Remove potential duplicates
-        toggleButton.addEventListener('click', toggleTheme);
-    }
-    if (toggleButtonLoggedOut) {
-        toggleButtonLoggedOut.removeEventListener('click', toggleTheme); // Remove potential duplicates
-        toggleButtonLoggedOut.addEventListener('click', toggleTheme);
-    }
-     console.log("Theme initialized to:", initialTheme); // Debug log
-};
-
-
-// --- Like Button Functionality ---
-
-/**
- * Updates the appearance and count of a like button.
- * @param {HTMLButtonElement} button - The like button element.
- * @param {boolean} liked - Whether the user currently likes the post.
- * @param {number} count - The new like count.
- */
-const updateLikeButton = (button, liked, count) => {
-    // ... (implementation remains the same) ...
-    const likeCountSpan = button.querySelector('.like-count');
-    const iconContainer = button.querySelector('svg')?.parentElement;
-
-    if (!likeCountSpan || !iconContainer) {
-        console.error('Could not find like count span or icon container for button:', button);
-        return;
-    }
-    likeCountSpan.textContent = count;
-    button.classList.toggle('text-red-500', liked);
-    button.classList.toggle('font-medium', liked);
-    button.classList.toggle('text-muted-foreground', !liked);
-    const filledIcon = button.querySelector('.like-icon-filled');
-    const outlineIcon = button.querySelector('.like-icon-outline');
-    if (filledIcon && outlineIcon) {
-        filledIcon.style.display = liked ? 'block' : 'none';
-        outlineIcon.style.display = liked ? 'none' : 'block';
-    } else {
-         console.warn('Could not find like icons within button:', button);
-    }
-    button.setAttribute('aria-pressed', liked.toString());
-};
-
-/**
- * Handles the click event on a like button.
- * @param {Event} event - The click event object.
- */
-const handleLikeClick = async (event) => {
-    // ... (implementation remains the same) ...
-     const button = event.currentTarget;
-    const postId = button.dataset.postId;
-    if (!postId || button.disabled) return;
-    const currentlyLiked = button.getAttribute('aria-pressed') === 'true'; // Use ARIA state
-    const method = currentlyLiked ? 'DELETE' : 'POST';
-    const url = `/api/posts/${postId}/like`;
-    button.disabled = true;
-    button.classList.add('opacity-70');
-    try {
-        const response = await fetch(url, { method: method, headers: { 'Accept': 'application/json' } });
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-             console.error(`Failed to ${method === 'POST' ? 'like' : 'unlike'} post:`, data.message || `HTTP ${response.status}`);
-        } else {
-            updateLikeButton(button, data.userLiked, data.newLikeCount);
-            // Update aria-label for screen readers
-            button.setAttribute('aria-label', data.userLiked ? 'Unlike post' : 'Like post');
-        }
-    } catch (error) {
-        console.error('Network error during like/unlike:', error);
-    } finally {
-         button.disabled = false;
-         button.classList.remove('opacity-70');
-    }
-};
-
-/**
-  * Initializes Like Buttons Adds listeners etc.
-  */
-const initializeLikeButtons = () => {
-    console.log("Attempting to initialize like buttons..."); // Debug log
-    const likeButtons = document.querySelectorAll('.like-button');
-    likeButtons.forEach(button => {
-        // Ensure initial ARIA state is set correctly (already done in PHP, but good fallback)
-        const initiallyLiked = button.classList.contains('text-red-500');
-        button.setAttribute('aria-pressed', initiallyLiked.toString());
-        button.setAttribute('aria-label', initiallyLiked ? 'Unlike post' : 'Like post');
-
-
-        if (!button.disabled) {
-            // Remove listener first to prevent duplicates if this runs multiple times
-            button.removeEventListener('click', handleLikeClick);
-            button.addEventListener('click', handleLikeClick);
-        }
-    });
-     console.log(`Initialized ${likeButtons.length} like buttons.`); // Debug log
-};
-
-
-const createCommentElement = (comment) => {
-    const div = document.createElement('div');
-    div.classList.add('comment-item', 'flex', 'items-start', 'space-x-2');
-    div.dataset.commentId = comment.comment_id;
-
-    // Basic check for necessary data
-    const authorPic = comment.author_picture_url || 'https://via.placeholder.com/32/cccccc/969696?text=';
-    const authorName = comment.author_name || 'Unknown User';
-    const timeAgo = comment.time_ago || '';
-    const content = comment.content || '';
-
-    div.innerHTML = `
-        <img src="${escapeHtml(authorPic)}" alt="${escapeHtml(authorName)}'s profile picture" class="w-8 h-8 rounded-full border bg-muted flex-shrink-0">
-        <div class="flex-grow bg-muted/50 dark:bg-muted/20 rounded-md px-3 py-1.5">
-            <div class="flex items-baseline space-x-2">
-                <span class="font-semibold text-foreground text-xs">${escapeHtml(authorName)}</span>
-                <span class="text-muted-foreground text-xs">${escapeHtml(timeAgo)}</span>
-                ${'' /* TODO: Add Delete button if comment.is_own_comment */}
-            </div>
-            <p class="text-foreground leading-snug">${escapeHtml(content).replace(/\n/g, '<br>')}</p>
-        </div>
-    `;
-    return div;
-};
-
-/**
- * Simple HTML escaping function
- */
 function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return '';
     return unsafe
@@ -223,204 +24,727 @@ function escapeHtml(unsafe) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+        .replace(/'/g, "&#039;");
 }
 
+function nl2br(str) {
+    if (typeof str === 'undefined' || str === null) {
+        return '';
+    }
+    return (str + '').replace(/([^>\r\n]?)(\r\n|\n\r|\r|\n)/g, '$1<br>$2');
+}
 
-/**
- * Loads and displays comments for a post.
- * @param {number} postId - The ID of the post.
- * @param {HTMLElement} commentSection - The container element for comments.
- */
-const loadComments = async (postId, commentSection) => {
-    const commentList = commentSection.querySelector('.comment-list');
-    const loadingIndicator = commentSection.querySelector('.loading-comments');
-    // const noCommentsIndicator = commentSection.querySelector('.no-comments'); // If using
+            const applyTheme = (theme) => {
+                const htmlElement = document.documentElement;
+                if (!htmlElement) return;
+                if (theme === 'dark') {
+                    htmlElement.classList.add('dark');
+                } else {
+                    htmlElement.classList.remove('dark');
+                }
+                const sunIcon = document.getElementById('theme-toggle-sun-icon');
+                const moonIcon = document.getElementById('theme-toggle-moon-icon');
+                if (sunIcon && moonIcon) {
+                    sunIcon.style.display = theme === 'dark' ? 'none' : 'block';
+                    moonIcon.style.display = theme === 'dark' ? 'block' : 'none';
+                }
+                const sunIconLoggedOut = document.getElementById('theme-toggle-sun-icon-logged-out');
+                const moonIconLoggedOut = document.getElementById('theme-toggle-moon-icon-logged-out');
+                if (sunIconLoggedOut && moonIconLoggedOut) {
+                    sunIconLoggedOut.style.display = theme === 'dark' ? 'none' : 'block';
+                    moonIconLoggedOut.style.display = theme === 'dark' ? 'block' : 'none';
+                }
+            };
+            const toggleTheme = () => {
+                const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setCookie('ui-theme', newTheme, 365);
+                applyTheme(newTheme);
+            };
+            const initializeTheme = () => {
+                console.log("Attempting to initialize theme...");
+                const savedTheme = getCookie('ui-theme');
+                const initialTheme = (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+                if (!savedTheme || (savedTheme !== 'dark' && savedTheme !== 'light')) {
+                    setCookie('ui-theme', initialTheme, 365);
+                }
+                applyTheme(initialTheme);
+                const toggleButton = document.getElementById('theme-toggle');
+                const toggleButtonLoggedOut = document.getElementById('theme-toggle-logged-out');
+                if (toggleButton) {
+                    toggleButton.removeEventListener('click', toggleTheme);
+                    toggleButton.addEventListener('click', toggleTheme);
+                }
+                if (toggleButtonLoggedOut) {
+                    toggleButtonLoggedOut.removeEventListener('click', toggleTheme);
+                    toggleButtonLoggedOut.addEventListener('click', toggleTheme);
+                }
+                console.log("Theme initialized to:", initialTheme);
+            };
 
-    if (!commentList || !loadingIndicator) return;
+            const updateLikeButton = (button, liked, count) => {
+                const likeCountSpan = button.querySelector('.like-count');
+                const iconContainer = button.querySelector('svg')?.parentElement;
+                if (!likeCountSpan || !iconContainer) {
+                    console.error('Could not find like count span or icon container for button:', button);
+                    return;
+                }
+                likeCountSpan.textContent = count;
+                button.classList.toggle('text-red-500', liked);
+                button.classList.toggle('font-medium', liked);
+                button.classList.toggle('text-muted-foreground', !liked);
+                const filledIcon = button.querySelector('.like-icon-filled');
+                const outlineIcon = button.querySelector('.like-icon-outline');
+                if (filledIcon && outlineIcon) {
+                    filledIcon.style.display = liked ? 'block' : 'none';
+                    outlineIcon.style.display = liked ? 'none' : 'block';
+                } else {
+                    console.warn('Could not find like icons within button:', button);
+                }
+                button.setAttribute('aria-pressed', liked.toString());
+            };
+            const handleLikeClick = async (event) => {
+                const button = event.currentTarget;
+                const postId = button.dataset.postId;
+                if (!postId || button.disabled) return;
+                const currentlyLiked = button.getAttribute('aria-pressed') === 'true';
+                const method = currentlyLiked ? 'DELETE' : 'POST';
+                const url = `/api/posts/${postId}/like`;
+                button.disabled = true;
+                button.classList.add('opacity-70');
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        console.error(`Failed to ${method === 'POST' ? 'like' : 'unlike'} post:`, data.message || `HTTP ${response.status}`);
+                    } else {
+                        updateLikeButton(button, data.userLiked, data.newLikeCount);
+                        button.setAttribute('aria-label', data.userLiked ? 'Unlike post' : 'Like post');
+                    }
+                } catch (error) {
+                    console.error('Network error during like/unlike:', error);
+                } finally {
+                    button.disabled = false;
+                    button.classList.remove('opacity-70');
+                }
+            };
+            const initializeLikeButtons = () => {
+                console.log("Attempting to initialize like buttons...");
+                const likeButtons = document.querySelectorAll('.like-button');
+                likeButtons.forEach(button => {
+                    const initiallyLiked = button.classList.contains('text-red-500');
+                    button.setAttribute('aria-pressed', initiallyLiked.toString());
+                    button.setAttribute('aria-label', initiallyLiked ? 'Unlike post' : 'Like post');
+                    if (!button.disabled) {
+                        button.removeEventListener('click', handleLikeClick);
+                        button.addEventListener('click', handleLikeClick);
+                    }
+                });
+                console.log(`Initialized ${likeButtons.length} like buttons.`);
+            };
 
-    loadingIndicator.style.display = 'block';
-    // if (noCommentsIndicator) noCommentsIndicator.style.display = 'none';
-    commentList.innerHTML = ''; // Clear previous comments (except loading indicator)
-    commentList.appendChild(loadingIndicator); // Keep loading indicator
+            const createCommentElement = (comment) => {
+                const div = document.createElement('div');
+                div.classList.add('comment-item', 'flex', 'items-start', 'space-x-2');
+                div.dataset.commentId = comment.comment_id;
+                const authorPic = comment.author_picture_url || 'https://via.placeholder.com/32/cccccc/969696?text=';
+                const authorName = comment.author_name || 'Unknown User';
+                const timeAgo = comment.time_ago || '';
+                const content = comment.content || '';
+                div.innerHTML = ` <img src="${escapeHtml(authorPic)}" alt="${escapeHtml(authorName)}'s profile picture" class="w-8 h-8 rounded-full border bg-muted flex-shrink-0"> <div class="flex-grow bg-muted/50 dark:bg-muted/20 rounded-md px-3 py-1.5"> <div class="flex items-baseline space-x-2"> <span class="font-semibold text-foreground text-xs">${escapeHtml(authorName)}</span> <span class="text-muted-foreground text-xs">${escapeHtml(timeAgo)}</span> </div> <p class="text-foreground leading-snug">${escapeHtml(content).replace(/\n/g, '<br>')}</p> </div> `;
+                return div;
+            };
+            const loadComments = async (postId, commentSection) => {
+                const commentList = commentSection.querySelector('.comment-list');
+                const loadingIndicator = commentSection.querySelector('.loading-comments');
+                if (!commentList || !loadingIndicator) return;
+                loadingIndicator.style.display = 'block';
+                commentList.innerHTML = '';
+                commentList.appendChild(loadingIndicator);
+                try {
+                    const response = await fetch(`/api/posts/${postId}/comments`);
+                    const data = await response.json();
+                    loadingIndicator.style.display = 'none';
+                    if (!response.ok || !data.success) {
+                        console.error('Failed to load comments:', data.message || `HTTP ${response.status}`);
+                        commentList.innerHTML = '<p class="text-destructive text-xs">Could not load comments.</p>';
+                    } else if (data.comments && data.comments.length > 0) {
+                        data.comments.forEach(comment => {
+                            commentList.appendChild(createCommentElement(comment));
+                        });
+                    } else {
+                        commentList.innerHTML = '<p class="text-muted-foreground text-xs no-comments">No comments yet.</p>';
+                    }
+                } catch (error) {
+                    console.error('Network error loading comments:', error);
+                    loadingIndicator.style.display = 'none';
+                    commentList.innerHTML = '<p class="text-destructive text-xs">Error loading comments.</p>';
+                }
+            };
+            const handleCommentToggle = (event) => {
+                const button = event.currentTarget;
+                const postId = button.dataset.postId;
+                const commentSectionId = `comment-section-${postId}`;
+                const commentSection = document.getElementById(commentSectionId);
+                if (!commentSection) return;
+                const isExpanded = button.getAttribute('aria-expanded') === 'true';
+                if (isExpanded) {
+                    commentSection.classList.add('hidden');
+                    button.setAttribute('aria-expanded', 'false');
+                } else {
+                    commentSection.classList.remove('hidden');
+                    button.setAttribute('aria-expanded', 'true');
+                    const listContent = commentSection.querySelector('.comment-list')?.innerHTML.trim() || '';
+                    const isLoading = !!commentSection.querySelector('.loading-comments');
+                    if (isLoading || listContent === '' || listContent.includes('no-comments') || listContent.includes('Could not load')) {
+                        loadComments(postId, commentSection);
+                    }
+                }
+            };
+            const handleAddComment = async (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const postId = form.dataset.postId;
+                const textarea = form.querySelector('textarea[name="content"]');
+                const submitButton = form.querySelector('button[type="submit"]');
+                const commentSection = document.getElementById(`comment-section-${postId}`);
+                const _commentListElement = commentSection ? commentSection.querySelector('.comment-list') : null;
+                const postContainer = document.querySelector(`[data-post-container-id="${postId}"]`);
+                const _commentCountDisplayElement = postContainer ? postContainer.querySelector('.comment-count-display') : null;
+                console.log("handleAddComment Debug Info:");
+                console.log("  - Post ID:", postId);
+                console.log("  - Textarea found:", !!textarea);
+                console.log("  - Submit Button found:", !!submitButton);
+                console.log("  - Comment Section found:", !!commentSection);
+                console.log("  - Comment List found:", !!_commentListElement);
+                console.log("  - Post Container found:", !!postContainer);
+                console.log("  - Comment Count Display found:", !!_commentCountDisplayElement);
+                if (!postId || !textarea || !submitButton || !_commentListElement || !_commentCountDisplayElement || !commentSection || !postContainer) {
+                    console.error('Could not find necessary elements for adding comment. Check specific logs above.');
+                    return;
+                }
+                const commentList = _commentListElement;
+                const commentCountDisplay = _commentCountDisplayElement;
+                const content = textarea.value.trim();
+                if (content === '') {
+                    textarea.focus();
+                    textarea.classList.add('ring-1', 'ring-destructive');
+                    setTimeout(() => textarea.classList.remove('ring-1', 'ring-destructive'), 1500);
+                    return;
+                }
+                submitButton.disabled = true;
+                submitButton.textContent = 'Posting...';
+                const payload = {
+                    content: content
+                };
+                console.log("[Comment Store - JS Sending]", JSON.stringify(payload));
+                try {
+                    const response = await fetch(`/api/posts/${postId}/comments`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        console.error('Failed to add comment:', data.message || `HTTP ${response.status}`);
+                        alert(`Error: ${data.message || 'Could not post comment.'}`);
+                    } else {
+                        textarea.value = '';
+                        const noCommentsMsg = commentList.querySelector('.no-comments');
+                        if (noCommentsMsg) noCommentsMsg.remove();
+                        if (data.comment) {
+                            commentList.appendChild(createCommentElement(data.comment));
+                        }
+                        const count = data.newCommentCount;
+                        commentCountDisplay.textContent = `${count} ${count === 1 ? 'Comment' : 'Comments'}`;
+                    }
+                } catch (error) {
+                    console.error('Network error adding comment:', error);
+                    alert('A network error occurred. Please try again.');
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Post';
+                }
+            };
+            const initializeComments = () => {
+                console.log("Attempting to initialize comments...");
+                document.querySelectorAll('.comment-toggle-button').forEach(button => {
+                    button.removeEventListener('click', handleCommentToggle);
+                    if (!button.disabled) {
+                        button.addEventListener('click', handleCommentToggle);
+                    }
+                });
+                document.querySelectorAll('.add-comment-form').forEach(form => {
+                    form.removeEventListener('submit', handleAddComment);
+                    form.addEventListener('submit', handleAddComment);
+                });
+                console.log("Comment listeners attached.");
+            };
 
-    try {
-        const response = await fetch(`/api/posts/${postId}/comments`);
-        const data = await response.json();
+            const updateFollowButton = (button, isFollowing) => {
+                const followText = button.querySelector('.follow-text');
+                if (!followText) return;
+                followText.textContent = isFollowing ? 'Following' : 'Follow';
+                button.classList.toggle('border', isFollowing);
+                button.classList.toggle('border-input', isFollowing);
+                button.classList.toggle('bg-background', isFollowing);
+                button.classList.toggle('hover:bg-accent', isFollowing);
+                button.classList.toggle('hover:text-accent-foreground', isFollowing);
+                button.classList.toggle('bg-primary', !isFollowing);
+                button.classList.toggle('text-primary-foreground', !isFollowing);
+                button.classList.toggle('hover:bg-primary/90', !isFollowing);
+                button.setAttribute('aria-pressed', isFollowing.toString());
+            };
+            const handleFollowToggle = async (event) => {
+                const button = event.currentTarget;
+                const userId = button.dataset.userId;
+                const spinner = button.querySelector('.loading-spinner');
+                if (!userId || button.disabled) return;
+                const currentlyFollowing = button.getAttribute('aria-pressed') === 'true';
+                const method = currentlyFollowing ? 'DELETE' : 'POST';
+                const url = `/api/users/${userId}/follow`;
+                button.disabled = true;
+                if (spinner) spinner.classList.remove('hidden');
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Accept': 'application/json',
+                        }
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        console.error(`Failed to ${method === 'POST' ? 'follow' : 'unfollow'} user:`, data.message || `HTTP ${response.status}`);
+                        alert(`Error: ${data.message || 'Could not perform follow action.'}`);
+                    } else {
+                        updateFollowButton(button, data.isFollowingNow);
+                        console.log(data.message);
+                    }
+                } catch (error) {
+                    console.error('Network error during follow/unfollow:', error);
+                    alert('A network error occurred. Please try again.');
+                } finally {
+                    button.disabled = false;
+                    if (spinner) spinner.classList.add('hidden');
+                }
+            };
+            const initializeFollowButtons = () => {
+                console.log("Attempting to initialize follow buttons...");
+                document.querySelectorAll('.follow-toggle-button').forEach(button => {
+                    button.removeEventListener('click', handleFollowToggle);
+                    if (!button.disabled) {
+                        button.addEventListener('click', handleFollowToggle);
+                    }
+                });
+                console.log("Follow button listeners attached.");
+            };
 
-        loadingIndicator.style.display = 'none'; // Hide loading indicator
+            const toggleEditState = (postContainer, showEditForm) => {
+                const displayContent = postContainer.querySelector('.post-display-content');
+                const editForm = postContainer.querySelector('.post-edit-form');
+                const optionsMenu = postContainer.querySelector('.post-options-menu');
+                const statusSpan = editForm?.querySelector('.edit-status');
+                if (!displayContent || !editForm) return;
+                displayContent.classList.toggle('hidden', showEditForm);
+                editForm.classList.toggle('hidden', !showEditForm);
+                if (statusSpan) statusSpan.textContent = '';
+                if (showEditForm && optionsMenu) {
+                    optionsMenu.classList.add('hidden');
+                }
+                if (showEditForm) {
+                    editForm.querySelector('textarea')?.focus();
+                } else {
+                    const currentDisplayHtml = displayContent.innerHTML;
+                    const currentDisplayText = displayContent.textContent || '';
+                    editForm.querySelector('textarea').value = currentDisplayText;
+                }
+            };
+            const handleEditButtonClick = (event) => {
+                const button = event.currentTarget;
+                const postContainer = button.closest('article[data-post-container-id]');
+                if (postContainer) {
+                    toggleEditState(postContainer, true);
+                }
+            };
+            const handleEditCancel = (event) => {
+                const button = event.currentTarget;
+                const postContainer = button.closest('article[data-post-container-id]');
+                if (postContainer) {
+                    toggleEditState(postContainer, false);
+                }
+            };
+            const handleEditSave = async (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const postId = form.dataset.postId;
+                const textarea = form.querySelector('textarea[name="content"]');
+                const saveButton = form.querySelector('.edit-save-button');
+                const cancelButton = form.querySelector('.edit-cancel-button');
+                const statusSpan = form.querySelector('.edit-status');
+                const postContainer = form.closest('article[data-post-container-id]');
+                const displayContent = postContainer?.querySelector('.post-display-content');
+                if (!postId || !textarea || !saveButton || !cancelButton || !postContainer || !displayContent || !statusSpan) {
+                    console.error("Missing elements for edit save.");
+                    return;
+                }
+                const newContent = textarea.value.trim();
+                if (newContent === '') {
+                    alert('Post content cannot be empty.');
+                    textarea.focus();
+                    return;
+                }
+                saveButton.disabled = true;
+                cancelButton.disabled = true;
+                textarea.disabled = true;
+                statusSpan.textContent = 'Saving...';
+                statusSpan.classList.remove('text-destructive');
+                try {
+                    const response = await fetch(`/api/posts/${postId}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            content: newContent
+                        })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        console.error('Failed to update post:', data.message || `HTTP ${response.status}`);
+                        statusSpan.textContent = `Error: ${data.message || 'Could not save.'}`;
+                        statusSpan.classList.add('text-destructive');
+                        saveButton.disabled = false;
+                        cancelButton.disabled = false;
+                        textarea.disabled = false;
+                    } else {
+                        displayContent.innerHTML = data.newContentHtml || nl2br(escapeHtml(newContent));
+                        statusSpan.textContent = '';
+                        toggleEditState(postContainer, false);
+                        saveButton.disabled = false;
+                        cancelButton.disabled = false;
+                        textarea.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Network error updating post:', error);
+                    statusSpan.textContent = 'Network error.';
+                    statusSpan.classList.add('text-destructive');
+                    saveButton.disabled = false;
+                    cancelButton.disabled = false;
+                    textarea.disabled = false;
+                }
+            };
+            const handleDeleteButtonClick = async (event) => {
+                const button = event.currentTarget;
+                const postContainer = button.closest('article[data-post-container-id]');
+                const postId = postContainer?.dataset.postContainerId;
+                const optionsMenu = button.closest('.post-options-menu');
+                if (!postId || !postContainer) return;
+                if (!confirm('Are you sure you want to delete this post? This cannot be undone.')) {
+                    if (optionsMenu) optionsMenu.classList.add('hidden');
+                    return;
+                }
+                button.disabled = true;
+                if (optionsMenu) optionsMenu.classList.add('hidden');
+                try {
+                    const response = await fetch(`/api/posts/${postId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                        }
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        console.error('Failed to delete post:', data.message || `HTTP ${response.status}`);
+                        alert(`Error: ${data.message || 'Could not delete post.'}`);
+                        button.disabled = false;
+                    } else {
+                        console.log(data.message);
+                        postContainer.style.transition = 'opacity 0.5s ease-out';
+                        postContainer.style.opacity = '0';
+                        setTimeout(() => {
+                            postContainer.remove();
+                        }, 500);
+                    }
+                } catch (error) {
+                    console.error('Network error deleting post:', error);
+                    alert('A network error occurred while deleting the post.');
+                    button.disabled = false;
+                }
+            };
+            const initializePostOptions = () => {
+                console.log("Attempting to initialize post options...");
+                document.querySelectorAll('.post-options-dropdown').forEach(dropdown => {
+                    const button = dropdown.querySelector('.post-options-button');
+                    const menu = dropdown.querySelector('.post-options-menu');
+                    if (!button || !menu) return;
+                    button.removeEventListener('click', toggleOptionsMenu);
+                    button.addEventListener('click', toggleOptionsMenu);
+                    const editButton = menu.querySelector('.post-edit-button');
+                    if (editButton) {
+                        editButton.removeEventListener('click', handleEditButtonClick);
+                        editButton.addEventListener('click', handleEditButtonClick);
+                    }
+                    const deleteButton = menu.querySelector('.post-delete-button');
+                    if (deleteButton) {
+                        deleteButton.removeEventListener('click', handleDeleteButtonClick);
+                        deleteButton.addEventListener('click', handleDeleteButtonClick);
+                    }
+                });
+                document.removeEventListener('click', hideOpenOptionMenus);
+                document.addEventListener('click', hideOpenOptionMenus);
+                document.querySelectorAll('.post-edit-form').forEach(form => {
+                    const cancelButton = form.querySelector('.edit-cancel-button');
+                    if (cancelButton) {
+                        cancelButton.removeEventListener('click', handleEditCancel);
+                        cancelButton.addEventListener('click', handleEditCancel);
+                    }
+                    form.removeEventListener('submit', handleEditSave);
+                    form.addEventListener('submit', handleEditSave);
+                });
+                console.log("Post options listeners attached.");
+            };
+            const toggleOptionsMenu = (e) => {
+                e.stopPropagation();
+                const button = e.currentTarget;
+                const menu = button.closest('.post-options-dropdown')?.querySelector('.post-options-menu');
+                if (!menu) return;
+                const isHidden = menu.classList.contains('hidden');
+                hideOpenOptionMenus(e, menu);
+                if (isHidden) {
+                    menu.classList.remove('hidden');
+                } else {
+                    menu.classList.add('hidden');
+                }
+            };
+            const hideOpenOptionMenus = (e, menuToKeepOpen = null) => {
+                document.querySelectorAll('.post-options-menu').forEach(menu => {
+                    if (menu !== menuToKeepOpen && !menu.closest('.post-options-dropdown').contains(e.target)) {
+                        menu.classList.add('hidden');
+                    }
+                });
+            };
 
-        if (!response.ok || !data.success) {
-            console.error('Failed to load comments:', data.message || `HTTP ${response.status}`);
-            commentList.innerHTML = '<p class="text-destructive text-xs">Could not load comments.</p>';
-        } else if (data.comments && data.comments.length > 0) {
-            data.comments.forEach(comment => {
-                commentList.appendChild(createCommentElement(comment));
+            const notificationToggleButton = document.getElementById('notification-toggle-button');
+            const notificationCountBadge = document.getElementById('notification-count-badge');
+            const notificationList = document.getElementById('notification-list');
+            const notificationItemsContainer = document.getElementById('notification-items-container');
+            const markAllReadButton = document.getElementById('mark-all-read-button');
+            
+            let unreadNotifications = []; // Store unread notifications fetched
+            
+            /**
+             * Formats a notification item into an HTML string.
+             */
+            const formatNotificationItem = (notification) => {
+                let message = '';
+                let link = '#'; // Default link
+            
+                const actorName = escapeHtml(notification.actor_name || 'Someone');
+                const actorPic = escapeHtml(notification.actor_picture || 'https://via.placeholder.com/32/cccccc/969696?text=');
+                const timeAgo = escapeHtml(notification.time_ago || '');
+            
+                // Customize message and link based on notification type
+                switch (notification.type) {
+                    case 'like':
+                        message = `liked your post.`;
+                        if (notification.post_id) {
+                             link = `/post/${notification.post_id}`; // TODO: Need a route/view for single posts later
+                             // For now, maybe link to the actor's profile?
+                             // link = `/profile/${notification.actor_id}`;
+                             link = '#'; // Placeholder link
+                        }
+                        break;
+                    case 'comment':
+                        message = `commented on your post.`;
+                         if (notification.post_id) {
+                             link = `/post/${notification.post_id}`; // TODO: Link to post later
+                              link = '#'; // Placeholder link
+                         }
+                        break;
+                    case 'follow':
+                        message = `started following you.`;
+                        if (notification.actor_id) {
+                            link = `/profile/${notification.actor_id}`; // Link to follower's profile
+                        }
+                        break;
+                    default:
+                        message = `sent you a notification.`;
+                }
+            
+                return `
+                    <a href="${link}" class="notification-item flex items-start px-3 py-2 hover:bg-accent text-foreground" data-notification-id="${notification.id}">
+                        <img src="${actorPic}" alt="${actorName}'s picture" class="w-8 h-8 rounded-full border bg-muted mr-2 flex-shrink-0">
+                        <div class="flex-grow">
+                            <p class="text-xs leading-snug">
+                                <strong class="font-medium">${actorName}</strong> ${message}
+                            </p>
+                            <p class="text-xs text-muted-foreground mt-0.5">${timeAgo}</p>
+                        </div>
+                        ${!notification.is_read ? '<span class="ml-2 mt-1 w-2 h-2 bg-primary rounded-full flex-shrink-0" title="Unread"></span>' : ''}
+                    </a>
+                `;
+            };
+            
+            /**
+             * Updates the notification UI (badge and dropdown list).
+             */
+            const updateNotificationUI = (count, notifications) => {
+                // Update badge
+                if (notificationCountBadge) {
+                    if (count > 0) {
+                        notificationCountBadge.textContent = count > 9 ? '9+' : count;
+                        notificationCountBadge.classList.remove('hidden');
+                    } else {
+                        notificationCountBadge.classList.add('hidden');
+                    }
+                }
+            
+                // Update dropdown list
+                if (notificationItemsContainer) {
+                    if (notifications.length > 0) {
+                        notificationItemsContainer.innerHTML = notifications.map(formatNotificationItem).join('');
+                    } else {
+                        notificationItemsContainer.innerHTML = '<p class="p-4 text-muted-foreground text-center text-xs">No unread notifications.</p>';
+                    }
+                }
+            
+                 // Enable/disable mark all read button
+                 if (markAllReadButton) {
+                      markAllReadButton.disabled = count === 0;
+                 }
+            };
+            
+            /**
+             * Fetches notifications from the API.
+             */
+            const fetchNotifications = async () => {
+                // Only fetch if elements exist (i.e., user is likely logged in)
+                if (!notificationToggleButton) return;
+            
+                console.log("Fetching notifications...");
+                try {
+                    const response = await fetch('/api/notifications'); // Fetches unread by default
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+            
+                    if (data.success) {
+                        unreadNotifications = data.notifications || []; // Store fetched notifications
+                        updateNotificationUI(data.unread_count || 0, unreadNotifications);
+                    } else {
+                         console.error("Failed to fetch notifications:", data.message);
+                         if (notificationItemsContainer) notificationItemsContainer.innerHTML = '<p class="p-4 text-destructive text-center text-xs">Could not load notifications.</p>';
+                    }
+                } catch (error) {
+                    console.error("Network error fetching notifications:", error);
+                    if (notificationItemsContainer) notificationItemsContainer.innerHTML = '<p class="p-4 text-destructive text-center text-xs">Error loading notifications.</p>';
+                    // Optionally disable badge/button on error
+                    if (notificationCountBadge) notificationCountBadge.classList.add('hidden');
+                    if (markAllReadButton) markAllReadButton.disabled = true;
+                }
+            };
+            
+            /**
+             * Marks notifications as read via API.
+             * @param {Array<number>|null} ids - Array of specific IDs, or null/empty to mark all currently fetched unread.
+             */
+            const markNotificationsRead = async (ids = null) => {
+                if (!ids && unreadNotifications.length === 0) return; // Nothing to mark
+            
+                const idsToMark = ids || unreadNotifications.map(n => n.id); // Use specific IDs or all fetched unread IDs
+                if (idsToMark.length === 0) return;
+            
+                console.log("Marking notifications read:", idsToMark);
+            
+                try {
+                    const response = await fetch('/api/notifications/mark-read', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ ids: idsToMark })
+                    });
+                    const data = await response.json();
+            
+                    if (!response.ok || !data.success) {
+                        console.error("Failed to mark notifications read:", data.message);
+                    } else {
+                        console.log("Notifications marked read.");
+                        // Refetch notifications to update the UI state (simplest way)
+                        // Or manually update the UI for faster feedback
+                        unreadNotifications = unreadNotifications.filter(n => !idsToMark.includes(n.id));
+                        updateNotificationUI(unreadNotifications.length, unreadNotifications); // Update immediately
+                         // Optionally refetch later for consistency: setTimeout(fetchNotifications, 1000);
+                    }
+                } catch (error) {
+                    console.error("Network error marking notifications read:", error);
+                }
+            };
+            
+            
+            /**
+             * Initializes Notification functionality.
+             */
+            const initializeNotifications = () => {
+                if (!notificationToggleButton) return; // Don't run if user isn't logged in / elements missing
+            
+                console.log("Initializing notifications...");
+            
+                // Toggle dropdown visibility
+                notificationToggleButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isHidden = notificationList.classList.contains('hidden');
+                    hideOpenOptionMenus(e); // Hide post options if open
+                    notificationList.classList.toggle('hidden');
+            
+                    // If opening and there are unread notifications, mark them read after a short delay
+                    if (isHidden && unreadNotifications.length > 0) {
+                         setTimeout(() => {
+                             markNotificationsRead(); // Mark all currently shown (fetched) unread ones
+                         }, 5000); // Delay marking slightly
+                    }
+                });
+            
+                 // Mark all read button
+                 if (markAllReadButton) {
+                     markAllReadButton.addEventListener('click', () => {
+                         markNotificationsRead();
+                     });
+                 }
+            
+                // Hide dropdown if clicked outside
+                document.addEventListener('click', (e) => {
+                    if (!notificationList.classList.contains('hidden') && !notificationDropdownContainer.contains(e.target)) {
+                         notificationList.classList.add('hidden');
+                     }
+                });
+            
+                // Initial fetch
+                fetchNotifications();
+            
+                // Optional: Poll for new notifications periodically (e.g., every minute)
+                // setInterval(fetchNotifications, 60000);
+            
+                 console.log("Notification listeners attached.");
+            };
+            
+            // --- Update DOMContentLoaded Listener ---
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log("DOMContentLoaded event fired.");
+                initializeTheme();
+                initializeLikeButtons();
+                initializeComments();
+                initializeFollowButtons();
+                initializePostOptions();
+                initializeNotifications(); // <-- Add this call
             });
-        } else {
-            // commentList.innerHTML = ''; // Clear loading indicator
-            // if (noCommentsIndicator) noCommentsIndicator.style.display = 'block';
-            commentList.innerHTML = '<p class="text-muted-foreground text-xs no-comments">No comments yet.</p>';
-        }
-    } catch (error) {
-        console.error('Network error loading comments:', error);
-        loadingIndicator.style.display = 'none';
-        commentList.innerHTML = '<p class="text-destructive text-xs">Error loading comments.</p>';
-    }
-};
-
-
-/**
- * Handles toggling the visibility of the comment section.
- * @param {Event} event - The click event object.
- */
-const handleCommentToggle = (event) => {
-    const button = event.currentTarget;
-    const postId = button.dataset.postId;
-    const commentSectionId = `comment-section-${postId}`;
-    const commentSection = document.getElementById(commentSectionId);
-
-    if (!commentSection) return;
-
-    const isExpanded = button.getAttribute('aria-expanded') === 'true';
-
-    if (isExpanded) {
-        // Collapse
-        commentSection.classList.add('hidden');
-        button.setAttribute('aria-expanded', 'false');
-    } else {
-        // Expand
-        commentSection.classList.remove('hidden');
-        button.setAttribute('aria-expanded', 'true');
-        // Load comments only if the list is currently empty or just has the loading/no comments message
-        const listContent = commentSection.querySelector('.comment-list')?.innerHTML.trim() || '';
-        const isLoading = !!commentSection.querySelector('.loading-comments'); // Check if loading indicator is present
-
-        // Only load if it hasn't been loaded successfully before
-        if (isLoading || listContent === '' || listContent.includes('no-comments') || listContent.includes('Could not load')) {
-             loadComments(postId, commentSection);
-        }
-    }
-};
-
-
-/**
- * Handles submission of the add comment form.
- * @param {Event} event - The submit event object.
- */
-const handleAddComment = async (event) => {
-    event.preventDefault(); // Prevent default form submission
-    const form = event.currentTarget;
-    const postId = form.dataset.postId;
-    const textarea = form.querySelector('textarea[name="content"]');
-    const submitButton = form.querySelector('button[type="submit"]');
-    const commentSection = document.getElementById(`comment-section-${postId}`);
-    // Use temporary variables to log clearly before the nullish coalescing/optional chaining
-    const _commentListElement = commentSection ? commentSection.querySelector('.comment-list') : null;
-    const postContainer = document.querySelector(`[data-post-container-id="${postId}"]`);
-    const _commentCountDisplayElement = postContainer ? postContainer.querySelector('.comment-count-display') : null;
-
-    // --- DETAILED LOGGING ---
-    console.log("handleAddComment Debug Info:");
-    console.log("  - Post ID:", postId);
-    console.log("  - Textarea found:", !!textarea); // Log true/false
-    console.log("  - Submit Button found:", !!submitButton); // Log true/false
-    console.log("  - Comment Section found:", !!commentSection); // Log true/false
-    console.log("  - Comment List found:", !!_commentListElement); // Log true/false
-    console.log("  - Post Container found:", !!postContainer); // Log true/false
-    console.log("  - Comment Count Display found:", !!_commentCountDisplayElement); // Log true/false
-    // --- END DETAILED LOGGING ---
-
-
-    // Check using the temporary vars
-    if (!postId || !textarea || !submitButton || !_commentListElement || !_commentCountDisplayElement || !commentSection || !postContainer) {
-        console.error('Could not find necessary elements for adding comment. Check specific logs above.');
-        return;
-    }
-    // Assign to original variables if checks pass
-    const commentList = _commentListElement;
-    const commentCountDisplay = _commentCountDisplayElement;
-
-    const content = textarea.value.trim();
-    if (content === '') {
-        // Optional: Add visual feedback for empty comment
-        textarea.focus();
-        textarea.classList.add('ring-1', 'ring-destructive');
-        setTimeout(() => textarea.classList.remove('ring-1', 'ring-destructive'), 1500);
-        return;
-    }
-
-    submitButton.disabled = true;
-    submitButton.textContent = 'Posting...'; // Feedback
-
-    try {
-        const response = await fetch(`/api/posts/${postId}/comments`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                // Add CSRF token if needed
-            },
-            body: JSON.stringify({ content: content })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            console.error('Failed to add comment:', data.message || `HTTP ${response.status}`);
-            // Optional: Show error message near the form
-             alert(`Error: ${data.message || 'Could not post comment.'}`); // Simple alert for now
-        } else {
-            // Clear textarea
-            textarea.value = '';
-            // Remove "No comments yet" message if present
-            const noCommentsMsg = commentList.querySelector('.no-comments');
-            if (noCommentsMsg) noCommentsMsg.remove();
-            // Prepend the new comment
-            if (data.comment) {
-                 commentList.appendChild(createCommentElement(data.comment)); // Append new comment
-                 // Scroll to the new comment? Optional.
-                 // commentList.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-             // Update comment count display
-            const count = data.newCommentCount;
-            commentCountDisplay.textContent = `${count} ${count === 1 ? 'Comment' : 'Comments'}`;
-
-        }
-
-    } catch (error) {
-        console.error('Network error adding comment:', error);
-         alert('A network error occurred. Please try again.'); // Simple alert
-    } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = 'Post';
-    }
-};
-
-// --- Initialize Comment Functionality ---
-const initializeComments = () => {
-     console.log("Attempting to initialize comments...");
-     document.querySelectorAll('.comment-toggle-button').forEach(button => {
-         button.removeEventListener('click', handleCommentToggle); // Prevent duplicates
-         if (!button.disabled) {
-             button.addEventListener('click', handleCommentToggle);
-         }
-     });
-
-     document.querySelectorAll('.add-comment-form').forEach(form => {
-         form.removeEventListener('submit', handleAddComment); // Prevent duplicates
-         form.addEventListener('submit', handleAddComment);
-     });
-      console.log("Comment listeners attached.");
-};
-
-
-// --- Update DOMContentLoaded Listener ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOMContentLoaded event fired.");
-    initializeTheme();
-    initializeLikeButtons();
-    initializeComments(); // <-- Add this call
-});
-
-console.log('Bailanysta app.js script parsed (Includes Comment AJAX).');
+            
+            console.log('Bailanysta app.js script parsed (Includes Notification AJAX).');
