@@ -54,3 +54,5 @@ $r->addRoute('DELETE', '/api/users/{userId:\d+}/follow', [UserController::class,
 // --- NOTIFICATION API Routes (New) ---
 $r->addRoute('GET', '/api/notifications', [NotificationController::class, 'index']); // Get unread notifications (or all recent)
 $r->addRoute('POST', '/api/notifications/mark-read', [NotificationController::class, 'markRead']); // Mark notifications as read
+
+$r->addRoute('GET', '/api/posts/search', [FeedController::class, 'search']);

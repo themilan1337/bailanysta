@@ -1,5 +1,7 @@
 // resources/js/app.js
 
+const APP_BASE_URL = typeof BASE_URL !== 'undefined' ? BASE_URL : '';
+
 function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
@@ -736,6 +738,164 @@ function nl2br(str) {
                  console.log("Notification listeners attached.");
             };
             
+            const searchInput = document.getElementById('search-input');
+            const postsContainer = document.getElementById('feed-posts-container'); // Target for results
+            const searchSpinner = document.getElementById('search-spinner');
+            const searchError = document.getElementById('search-error');
+            const initialFeedContent = postsContainer ? postsContainer.innerHTML : ''; // Store initial feed content
+            let searchTimeoutId = null;
+            let currentSearchController = null; // To abort previous requests
+            
+            /**
+             * Renders posts received from search API into the container.
+             */
+            const renderSearchResults = (posts) => {
+                if (!postsContainer) return;
+            
+                searchError.textContent = ''; // Clear previous errors
+                searchError.classList.add('hidden');
+            
+                if (posts.length === 0) {
+                    postsContainer.innerHTML = '<p class="text-center text-muted-foreground py-10">No posts found matching your search.</p>';
+                } else {
+                    // Note: Assumes a global $isLoggedIn JS variable or check session status differently if needed in partial
+                    // For simplicity, we might need to pass isLoggedIn status somehow if using pure JS rendering.
+                    // Using PHP include for now, so it should inherit scope.
+                    // This requires the server to return HTML snippets, not JSON data.
+                    // Alternative: Build post cards purely in JS (more complex).
+            
+                    // --- TEMPORARY: Pure JS Rendering (Simpler for now) ---
+                    postsContainer.innerHTML = posts.map(post => {
+                         // Simplified rendering - does NOT include event listeners or complex logic from partial
+                         // A more robust solution would use a template engine or framework component.
+                        const postHtml = `
+                             <article class="bg-card border rounded-lg shadow-sm overflow-hidden flex flex-col" data-post-container-id="${post.post_id}">
+                                 <div class="p-4 flex items-start space-x-3">
+                                     <a href="${APP_BASE_URL}/profile/${post.author_id}">
+                                         <img src="${escapeHtml(post.author_picture_url || 'https://via.placeholder.com/40/cccccc/969696?text=')}" alt="${escapeHtml(post.author_name)}'s picture" class="w-10 h-10 rounded-full border bg-muted">
+                                     </a>
+                                     <div class="flex-grow">
+                                         <a href="${APP_BASE_URL}/profile/${post.author_id}" class="font-semibold text-foreground hover:underline">${escapeHtml(post.author_name)}</a>
+                                         <p class="text-xs text-muted-foreground">${escapeHtml(post.time_ago)}</p>
+                                     </div>
+                                     ${ post.isAuthor ? `<!-- TODO: Add options button -->` : '' }
+                                 </div>
+                                 <div class="post-content-area px-4 pb-4">
+                                     <div class="post-display-content max-w-none dark:text-gray-200">
+                                          ${post.content}
+                                     </div>
+                                     ${ post.isAuthor ? `<!-- TODO: Add Edit Form -->` : '' }
+                                 </div>
+                                 <div class="px-4 pt-3 pb-1 border-t flex items-center justify-between text-sm text-muted-foreground">
+                                    <div class="flex space-x-4">
+                                       <span class="like-count-display">${post.like_count} ${post.like_count == 1 ? 'Like' : 'Likes'}</span>
+                                       <span class="comment-count-display">${post.comment_count} ${post.comment_count == 1 ? 'Comment' : 'Comments'}</span>
+                                    </div>
+                                 </div>
+                                  <div class="p-2 border-t grid grid-cols-2 gap-1">
+                                        <!-- TODO: Re-render Like/Comment buttons properly with state/listeners -->
+                                        <button disabled class="flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground opacity-50">Like</button>
+                                        <button disabled class="flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground opacity-50">Comment</button>
+                                  </div>
+                             </article>
+                         `;
+                         return postHtml;
+                    }).join('');
+            
+                     // --- IMPORTANT: Re-initialize listeners for the new content ---
+                     // This is crucial if rendering dynamic HTML that needs JS interaction
+                     // Note: This is a simple re-initialization, might cause issues if not handled carefully
+                     initializeLikeButtons();
+                     initializeComments();
+                     initializePostOptions();
+                     // Follow buttons aren't typically on post cards, so no need here.
+            
+                }
+            };
+            
+            /**
+             * Performs the search request.
+             */
+            const performSearch = async (searchTerm) => {
+                if (!postsContainer || !searchSpinner || !searchError) return;
+            
+                // Abort previous pending search request
+                if (currentSearchController) {
+                    currentSearchController.abort();
+                }
+                currentSearchController = new AbortController(); // Create a new controller for this request
+                const signal = currentSearchController.signal;
+            
+                searchSpinner.classList.remove('hidden'); // Show spinner
+                searchError.textContent = '';
+                searchError.classList.add('hidden');
+            
+                // If search term is empty, restore initial feed content
+                if (searchTerm.trim() === '') {
+                    postsContainer.innerHTML = initialFeedContent;
+                    searchSpinner.classList.add('hidden');
+                     // Re-initialize listeners for the original content
+                     initializeLikeButtons();
+                     initializeComments();
+                     initializePostOptions();
+                     // You might need to re-fetch original posts if state is lost,
+                     // or store initial state more robustly.
+                    return;
+                }
+            
+                try {
+                    const response = await fetch(`/api/posts/search?q=${encodeURIComponent(searchTerm)}`, { signal }); // Pass the signal
+            
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+            
+                    const data = await response.json();
+            
+                    if (data.success) {
+                        renderSearchResults(data.posts);
+                    } else {
+                        searchError.textContent = data.message || 'Search failed.';
+                        searchError.classList.remove('hidden');
+                        postsContainer.innerHTML = ''; // Clear posts on error
+                    }
+            
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        console.log('Search request aborted.'); // Don't show error if intentionally aborted
+                    } else {
+                        console.error('Search network error:', error);
+                        searchError.textContent = 'Error performing search. Check connection.';
+                        searchError.classList.remove('hidden');
+                        postsContainer.innerHTML = ''; // Clear posts on error
+                    }
+                } finally {
+                    searchSpinner.classList.add('hidden'); // Hide spinner
+                    currentSearchController = null; // Clear controller
+                }
+            };
+            
+            /**
+             * Initializes Search functionality.
+             */
+            const initializeSearch = () => {
+                if (!searchInput) return;
+                console.log("Initializing search...");
+            
+                searchInput.addEventListener('input', (event) => {
+                    const searchTerm = event.target.value;
+            
+                    // Clear previous timeout if user is still typing
+                    clearTimeout(searchTimeoutId);
+            
+                    // Set a new timeout to perform search after user stops typing (e.g., 500ms)
+                    searchTimeoutId = setTimeout(() => {
+                        performSearch(searchTerm);
+                    }, 500); // Debounce time in milliseconds
+                });
+                 console.log("Search listener attached.");
+            };
+            
             // --- Update DOMContentLoaded Listener ---
             document.addEventListener('DOMContentLoaded', () => {
                 console.log("DOMContentLoaded event fired.");
@@ -744,7 +904,8 @@ function nl2br(str) {
                 initializeComments();
                 initializeFollowButtons();
                 initializePostOptions();
-                initializeNotifications(); // <-- Add this call
+                initializeNotifications();
+                initializeSearch(); // <-- Add this call
             });
             
-            console.log('Bailanysta app.js script parsed (Includes Notification AJAX).');
+            console.log('Bailanysta app.js script parsed (Includes Search AJAX).');
