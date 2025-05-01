@@ -8,6 +8,7 @@ use App\Controllers\PostController;
 use App\Controllers\CommentController;
 use App\Controllers\UserController;
 use App\Controllers\NotificationController;
+use App\Controllers\AiController;
 /**
  * Defines the application routes.
  * The $r variable is an instance of FastRoute\RouteCollector provided by public/index.php
@@ -56,3 +57,5 @@ $r->addRoute('GET', '/api/notifications', [NotificationController::class, 'index
 $r->addRoute('POST', '/api/notifications/mark-read', [NotificationController::class, 'markRead']); // Mark notifications as read
 
 $r->addRoute('GET', '/api/posts/search', [FeedController::class, 'search']);
+
+$r->addRoute('POST', '/api/ai/generate-post-idea', [AiController::class, 'generatePostIdea']);

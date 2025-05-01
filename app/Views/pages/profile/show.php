@@ -1,7 +1,12 @@
 <?php
+// app/Views/pages/profile/show.php
+
 $isLoggedIn = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
-$viewerIsFollowing = $user['viewer_is_following'] ?? false;
-$currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null;
+// $user is the profile being viewed (passed from controller)
+// $posts are the posts of the user being viewed (passed from controller)
+// $isOwnProfile is a boolean flag (passed from controller)
+$viewerIsFollowing = $user['viewer_is_following'] ?? false; // Get follow status from controller data
+$currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null; // Needed for post author check
 ?>
 
 <div class="max-w-3xl mx-auto space-y-8">
@@ -75,11 +80,28 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null;
         </div>
 
         <div class="bg-card border rounded-lg p-4 shadow-sm">
-             <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST">
-                <h2 class="text-lg font-semibold mb-3 text-foreground">Create a New Post</h2>
-                 <textarea name="content" rows="4"
-                           class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm"
-                           placeholder="Share something..."></textarea>
+             <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST" enctype="multipart/form-data" id="create-post-form-profile">
+                 <h2 class="text-lg font-semibold mb-3 text-foreground">Create a New Post</h2>
+                  <textarea name="content" rows="4"
+                            class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm"
+                            placeholder="Share something... You can also add context below and generate an idea!"></textarea>
+
+                <div class="flex items-end space-x-2 mt-3">
+                    <div class="flex-grow">
+                        <label for="ai_prompt_profile" class="block text-xs font-medium text-muted-foreground mb-1">Optional AI Prompt Context:</label>
+                        <input type="text" id="ai_prompt_profile" name="ai_prompt" class="w-full p-1 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none placeholder:text-muted-foreground text-xs" placeholder="e.g., my weekend trip">
+                    </div>
+                    <button type="button" form="create-post-form-profile" class="generate-idea-button inline-flex items-center text-xs font-medium rounded-md ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-7 px-2 space-x-1 flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4"><path d="M9.06 2.314a.75.75 0 0 1 .834.343l.194.387a1.5 1.5 0 0 0 .576.753l.411.206a.75.75 0 0 1 .36.99l-.143.43a1.5 1.5 0 0 0 .326 1.333l.31.31a.75.75 0 0 1 0 1.06l-.31.31a1.5 1.5 0 0 0-.326 1.333l.143.43a.75.75 0 0 1-.36.99l-.411.206a1.5 1.5 0 0 0-.576.753l-.194.387a.75.75 0 0 1-.834.343l-.465-.116a1.5 1.5 0 0 0-1.16 0l-.465.116a.75.75 0 0 1-.834-.343l-.194-.387a1.5 1.5 0 0 0-.576-.753l-.411-.206a.75.75 0 0 1-.36-.99l.143-.43a1.5 1.5 0 0 0-.326-1.333l-.31-.31a.75.75 0 0 1 0-1.06l.31-.31a1.5 1.5 0 0 0 .326-1.333l-.143-.43a.75.75 0 0 1 .36-.99l.411-.206a1.5 1.5 0 0 0 .576-.753l.194-.387a.75.75 0 0 1 .834-.343l.465.116a1.5 1.5 0 0 0 1.16 0l.465-.116ZM3.25 8.75a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v.008a.75.75 0 0 1-.75.75h-.008a.75.75 0 0 1-.75-.75V8.75ZM7.25 5a.75.75 0 0 0 0 1.5h.008a.75.75 0 0 0 0-1.5H7.25ZM5.25 11a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v.008a.75.75 0 0 1-.75.75h-.008a.75.75 0 0 1-.75-.75V11Z" /></svg>
+                        <span>Generate</span>
+                    </button>
+                </div>
+
+                 <div class="mt-4">
+                     <label for="post_image_profile" class="block text-sm font-medium text-muted-foreground mb-1">Attach Image (Optional)</label>
+                     <input type="file" name="post_image" id="post_image_profile" accept="image/jpeg, image/png, image/gif, image/webp" class="block w-full text-sm text-muted-foreground border border-input rounded-md cursor-pointer bg-background focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90">
+                     <p class="text-xs text-muted-foreground mt-1">Max file size: 2MB.</p>
+                </div>
                  <div class="flex justify-end mt-3">
                      <button type="submit"
                              class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3">
@@ -98,7 +120,7 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null;
            <?php else: ?>
                <div class="space-y-6">
                     <?php foreach ($posts as $post): ?>
-                         <?php include __DIR__ . '/../../_partials/post_card.php'; // Corrected Path ?>
+                         <?php include __DIR__ . '/../../_partials/post_card.php'; ?>
                     <?php endforeach; ?>
                </div>
            <?php endif; ?>
@@ -127,7 +149,7 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null;
               <?php else: ?>
                   <div class="space-y-6">
                       <?php foreach ($posts as $post): ?>
-                            <?php include __DIR__ . '/../../_partials/post_card.php'; // Corrected Path ?>
+                            <?php include __DIR__ . '/../../_partials/post_card.php'; ?>
                       <?php endforeach; ?>
                   </div>
               <?php endif; ?>

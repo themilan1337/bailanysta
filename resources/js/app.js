@@ -1,6 +1,7 @@
 // resources/js/app.js
 
 const APP_BASE_URL = typeof BASE_URL !== 'undefined' ? BASE_URL : '';
+const sessionUserPictureUrl = typeof SESSION_USER_PICTURE !== 'undefined' ? SESSION_USER_PICTURE : null;
 
 function getCookie(name) {
     const value = `; ${document.cookie}`;
@@ -752,64 +753,121 @@ function nl2br(str) {
             const renderSearchResults = (posts) => {
                 if (!postsContainer) return;
             
-                searchError.textContent = ''; // Clear previous errors
+                searchError.textContent = '';
                 searchError.classList.add('hidden');
+            
+                const isLoggedIn = !!document.querySelector('a[href$="/logout"]');
+                const currentUserId = typeof CURRENT_USER_ID !== 'undefined' ? CURRENT_USER_ID : null;
+                // Make sure sessionUserPictureUrl is accessible (defined globally in the module scope)
+                // const sessionUserPictureUrl = typeof SESSION_USER_PICTURE !== 'undefined' ? SESSION_USER_PICTURE : null; // Already defined globally
             
                 if (posts.length === 0) {
                     postsContainer.innerHTML = '<p class="text-center text-muted-foreground py-10">No posts found matching your search.</p>';
                 } else {
-                    // Note: Assumes a global $isLoggedIn JS variable or check session status differently if needed in partial
-                    // For simplicity, we might need to pass isLoggedIn status somehow if using pure JS rendering.
-                    // Using PHP include for now, so it should inherit scope.
-                    // This requires the server to return HTML snippets, not JSON data.
-                    // Alternative: Build post cards purely in JS (more complex).
-            
-                    // --- TEMPORARY: Pure JS Rendering (Simpler for now) ---
                     postsContainer.innerHTML = posts.map(post => {
-                         // Simplified rendering - does NOT include event listeners or complex logic from partial
-                         // A more robust solution would use a template engine or framework component.
+                        const isAuthor = currentUserId !== null && currentUserId === post.author_id;
+            
+                        // Prepare button states (same as before)
+                        const likeButtonClasses = `like-button flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md hover:bg-accent transition-colors ${post.user_liked ? 'text-red-500 font-medium' : 'text-muted-foreground'} ${!isLoggedIn ? 'cursor-not-allowed opacity-60' : ''}`;
+                        const likeButtonDisabled = !isLoggedIn ? 'disabled title="Login to like posts"' : '';
+                        const likeButtonAriaLabel = post.user_liked ? 'Unlike' : 'Like';
+                        const likeButtonAriaPressed = post.user_liked ? 'true' : 'false';
+                        const outlineIconStyle = `display: ${post.user_liked ? 'none' : 'block'};`;
+                        const filledIconStyle = `display: ${post.user_liked ? 'block' : 'none'};`;
+                        const commentButtonClasses = `comment-toggle-button flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground hover:bg-accent transition-colors ${!isLoggedIn ? 'cursor-not-allowed opacity-60' : ''}`;
+                        const commentButtonDisabled = !isLoggedIn ? 'disabled title="Login to comment"' : '';
+            
+                        // Prepare author picture URL with fallback
+                        const authorPicSrc = escapeHtml(post.author_picture_url || 'https://via.placeholder.com/40/cccccc/969696?text=');
+                        // Prepare current user picture URL with fallback for comment form
+                        const currentUserPicSrc = escapeHtml(sessionUserPictureUrl || 'https://via.placeholder.com/32/cccccc/969696?text=');
+            
+            
+                        // Generate the HTML string with correct avatars
                         const postHtml = `
                              <article class="bg-card border rounded-lg shadow-sm overflow-hidden flex flex-col" data-post-container-id="${post.post_id}">
                                  <div class="p-4 flex items-start space-x-3">
                                      <a href="${APP_BASE_URL}/profile/${post.author_id}">
-                                         <img src="${escapeHtml(post.author_picture_url || 'https://via.placeholder.com/40/cccccc/969696?text=')}" alt="${escapeHtml(post.author_name)}'s picture" class="w-10 h-10 rounded-full border bg-muted">
+                                         <img src="${authorPicSrc}" alt="${escapeHtml(post.author_name)}'s picture" class="w-10 h-10 rounded-full border bg-muted hover:opacity-80 transition-opacity">
                                      </a>
                                      <div class="flex-grow">
                                          <a href="${APP_BASE_URL}/profile/${post.author_id}" class="font-semibold text-foreground hover:underline">${escapeHtml(post.author_name)}</a>
                                          <p class="text-xs text-muted-foreground">${escapeHtml(post.time_ago)}</p>
                                      </div>
-                                     ${ post.isAuthor ? `<!-- TODO: Add options button -->` : '' }
+                                     ${ isAuthor ? `
+                                          <div class="relative post-options-dropdown">
+                                             <button type="button" aria-label="Post options" class="post-options-button p-1 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM10 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM11.5 15.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" /></svg></button>
+                                             <div class="post-options-menu hidden absolute right-0 mt-1 w-36 bg-popover border rounded-md shadow-lg z-10 py-1 text-sm">
+                                                <button type="button" class="post-edit-button block w-full text-left px-3 py-1.5 text-foreground hover:bg-accent">Edit Post</button>
+                                                <button type="button" class="post-delete-button block w-full text-left px-3 py-1.5 text-destructive hover:bg-destructive/10">Delete Post</button>
+                                             </div>
+                                          </div>
+                                     ` : '' }
                                  </div>
-                                 <div class="post-content-area px-4 pb-4">
-                                     <div class="post-display-content max-w-none dark:text-gray-200">
-                                          ${post.content}
+            
+                                 <div class="post-content-area px-4 ${ post.content ? 'pb-4' : 'pb-1'}">
+                                    ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${post.content}</div>` : ''}
+                                    ${ isAuthor ? `
+                                        <form class="post-edit-form hidden mt-2" data-post-id="${post.post_id}">
+                                            <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
+                                            <div class="flex justify-end items-center space-x-2 mt-2">
+                                                <span class="edit-status text-xs text-muted-foreground"></span>
+                                                <button type="button" class="edit-cancel-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
+                                                <button type="submit" class="edit-save-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Save Changes</button>
+                                            </div>
+                                        </form>
+                                        ` : '' }
+                                 </div>
+            
+                                 ${ post.image_url ? `
+                                     <div class="bg-muted border-t dark:border-gray-700 max-h-[60vh] overflow-hidden">
+                                          <a href="${APP_BASE_URL}${escapeHtml(post.image_url)}" target="_blank" rel="noopener noreferrer" title="View full image">
+                                               <img src="${APP_BASE_URL}${escapeHtml(post.image_url)}" alt="Post image" class="w-full h-auto object-contain display-block" loading="lazy">
+                                          </a>
                                      </div>
-                                     ${ post.isAuthor ? `<!-- TODO: Add Edit Form -->` : '' }
-                                 </div>
+                                 ` : ''}
+            
                                  <div class="px-4 pt-3 pb-1 border-t flex items-center justify-between text-sm text-muted-foreground">
                                     <div class="flex space-x-4">
                                        <span class="like-count-display">${post.like_count} ${post.like_count == 1 ? 'Like' : 'Likes'}</span>
                                        <span class="comment-count-display">${post.comment_count} ${post.comment_count == 1 ? 'Comment' : 'Comments'}</span>
                                     </div>
                                  </div>
+            
                                   <div class="p-2 border-t grid grid-cols-2 gap-1">
-                                        <!-- TODO: Re-render Like/Comment buttons properly with state/listeners -->
-                                        <button disabled class="flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground opacity-50">Like</button>
-                                        <button disabled class="flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground opacity-50">Comment</button>
+                                        <button data-post-id="${post.post_id}" aria-label="${likeButtonAriaLabel} post" aria-pressed="${likeButtonAriaPressed}" class="${likeButtonClasses}" ${likeButtonDisabled}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="like-icon-outline w-5 h-5" style="${outlineIconStyle}"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="like-icon-filled w-5 h-5" style="${filledIconStyle}"><path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" /></svg>
+                                            <span>Like <span class="like-count font-normal">${post.like_count}</span></span>
+                                        </button>
+                                        <button data-post-id="${post.post_id}" aria-expanded="false" aria-controls="comment-section-${post.post_id}" class="${commentButtonClasses}" ${commentButtonDisabled}>
+                                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
+                                           <span>Comment</span>
+                                       </button>
+                                  </div>
+                                  <div id="comment-section-${post.post_id}" class="comment-section border-t px-4 py-3 space-y-3 hidden">
+                                        <div class="comment-list space-y-3 text-sm">
+                                            <p class="text-muted-foreground text-xs loading-comments">Loading comments...</p>
+                                        </div>
+                                        ${isLoggedIn ? `
+                                        <form class="add-comment-form flex items-start space-x-2 pt-3" data-post-id="${post.post_id}">
+                                            <img src="${currentUserPicSrc}" alt="Your profile picture" class="w-8 h-8 rounded-full border bg-muted flex-shrink-0 mt-1">
+                                            <div class="flex-grow">
+                                                <textarea name="content" rows="1" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm" placeholder="Add a comment..."></textarea>
+                                                <button type="submit" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 mt-1 float-right">Post</button>
+                                            </div>
+                                        </form>
+                                        ` : ''}
                                   </div>
                              </article>
                          `;
                          return postHtml;
                     }).join('');
             
-                     // --- IMPORTANT: Re-initialize listeners for the new content ---
-                     // This is crucial if rendering dynamic HTML that needs JS interaction
-                     // Note: This is a simple re-initialization, might cause issues if not handled carefully
+                     // Re-initialize listeners after rendering new content
                      initializeLikeButtons();
                      initializeComments();
                      initializePostOptions();
-                     // Follow buttons aren't typically on post cards, so no need here.
-            
                 }
             };
             
@@ -896,6 +954,85 @@ function nl2br(str) {
                  console.log("Search listener attached.");
             };
             
+            const handleGenerateIdeaClick = async (event) => {
+                const button = event.currentTarget;
+                // Find the form this button belongs to (using the form attribute or closest)
+                const formId = button.getAttribute('form');
+                const form = formId ? document.getElementById(formId) : button.closest('form');
+            
+                if (!form) {
+                     console.error("Could not find associated form for generate idea button.");
+                     alert("Error: Cannot find form context.");
+                     return;
+                }
+            
+                // Find elements within the identified form
+                const textarea = form.querySelector('textarea[name="content"]');
+                const promptInput = form.querySelector('input[name="ai_prompt"]'); // Find the prompt input
+            
+                if (!textarea) {
+                    console.error("Could not find associated textarea within the form.");
+                    alert("Error: Cannot find where to put the generated idea.");
+                    return;
+                }
+            
+                // Get custom prompt context from the input field
+                const customPromptText = promptInput ? promptInput.value.trim() : '';
+            
+                button.disabled = true;
+                const originalButtonHtml = button.innerHTML; // Store original content
+                button.innerHTML = `
+                    <svg class="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Generating...</span>`;
+            
+                try {
+                    const payload = {}; // Prepare payload
+                    if (customPromptText !== '') {
+                        payload.prompt = customPromptText; // Add prompt only if not empty
+                    }
+            
+                    const response = await fetch('/api/ai/generate-post-idea', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+            
+                    if (!response.ok || !data.success) {
+                         console.error("Failed to generate content:", data.message || `HTTP ${response.status}`);
+                         alert(`Error generating idea: ${data.message || 'Request failed.'}`);
+                    } else if (data.idea) {
+                         textarea.value = data.idea; // Replace content in the main textarea
+                         textarea.focus();
+                    } else {
+                        alert("Received an empty idea from the AI service.");
+                    }
+            
+                } catch(error) {
+                    console.error("Network error generating idea:", error);
+                    alert("A network error occurred while generating the idea.");
+                } finally {
+                     button.disabled = false;
+                     button.innerHTML = originalButtonHtml; // Restore original button content
+                }
+            };
+            
+            const initializeAiFeatures = () => {
+                console.log("Initializing AI features...");
+                document.querySelectorAll('.generate-idea-button').forEach(button => {
+                    button.removeEventListener('click', handleGenerateIdeaClick); // Prevent duplicates
+                    button.addEventListener('click', handleGenerateIdeaClick);
+                });
+                 console.log("AI feature listeners attached.");
+            };
+            
+            
             // --- Update DOMContentLoaded Listener ---
             document.addEventListener('DOMContentLoaded', () => {
                 console.log("DOMContentLoaded event fired.");
@@ -905,7 +1042,8 @@ function nl2br(str) {
                 initializeFollowButtons();
                 initializePostOptions();
                 initializeNotifications();
-                initializeSearch(); // <-- Add this call
+                initializeSearch();
+                initializeAiFeatures(); // <-- Add this call
             });
             
-            console.log('Bailanysta app.js script parsed (Includes Search AJAX).');
+            console.log('Bailanysta app.js script parsed (Includes AI Features).');
