@@ -6,8 +6,7 @@
 function view(string $view, array $data = []): string
 {
     // No require_once needed here
-    $viewPath =
-        dirname(__DIR__) . "/Views/" . str_replace(".", "/", $view) . ".php";
+    $viewPath = dirname(__DIR__) . '/Views/' . str_replace('.', '/', $view) . '.php';
     if (!file_exists($viewPath)) {
         error_log("View file not found: {$viewPath}");
         return "Error: View file '{$view}' not found.";

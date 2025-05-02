@@ -831,7 +831,7 @@ function nl2br(str) {
                                  </div>
             
                                  <div class="post-content-area px-4 ${ post.content ? 'pb-4' : 'pb-1'}">
-                                    ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${nl2br(escapeHtml(post.content))}</div>` : ''}
+                                    ${ post.content ? `<div class="post-display-content prose prose-sm dark:prose-invert max-w-none">${nl2br(escapeHtml(post.content))}</div>` : ''}
                                     ${ isAuthor ? `
                                         <form class="post-edit-form hidden mt-2" data-post-id="${post.post_id}">
                                             <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
@@ -895,99 +895,83 @@ function nl2br(str) {
                      initializePostOptions();
                 }
             };
-
-            const fetchAndRenderFeedPage = async (offset = 0, limit = postsPerLoad, replaceContainer = false) => {
-                if (isLoadingPosts || !feedPostsContainer) return;
-                isLoadingPosts = true;
-                if (loadingIndicator && !replaceContainer) loadingIndicator.style.display = 'block';
-                if (searchSpinner && replaceContainer) searchSpinner.classList.remove('hidden');
-                if (searchError) searchError.classList.add('hidden');
-                console.log(`Fetching feed page... Offset: ${offset}, Limit: ${limit}, Replace: ${replaceContainer}`);
-                try {
-                    const response = await fetch(`${APP_BASE_URL}/?ajax=1&offset=${offset}&limit=${limit}`);
-                    const data = await response.json();
-                    if (!response.ok || !data.success) { throw new Error(data.message || 'Failed feed load'); }
-                    if (replaceContainer) {
-                        if (data.posts && data.posts.length > 0) { renderPosts(data.posts, true); }
-                        else { feedPostsContainer.innerHTML = '<p class="text-center ...">No posts found.</p>'; }
-                        noMorePosts = (data.posts?.length ?? 0) < limit;
-                        console.log("Resetting infinite scroll state. No More:", noMorePosts);
-                        if (noMorePosts && loadingIndicator) { loadingIndicator.innerHTML = '<p ...>End of feed.</p>'; loadingIndicator.style.display = 'block'; }
-                        else if (loadingIndicator) { loadingIndicator.style.display = 'none'; }
-                    } else {
-                        if (data.posts && data.posts.length > 0) {
-                            renderPosts(data.posts, false);
-                            if (data.posts.length < limit) { noMorePosts = true; if(loadingIndicator) loadingIndicator.innerHTML = '<p ...>End of feed.</p>'; }
-                        } else { noMorePosts = true; if(loadingIndicator) loadingIndicator.innerHTML = '<p ...>No more posts.</p>'; }
-                    }
-                } catch (error) {
-                     console.error("Error fetching/rendering feed page:", error);
-                     if (replaceContainer && feedPostsContainer) { feedPostsContainer.innerHTML = `<p ...>Error loading feed.</p>`; }
-                     else if (loadingIndicator) { loadingIndicator.innerHTML = '<p ...>Error loading posts.</p>'; loadingIndicator.style.display = 'block'; }
-                     noMorePosts = true;
-                } finally {
-                     isLoadingPosts = false;
-                     if (loadingIndicator && !noMorePosts) loadingIndicator.style.display = 'none';
-                     if (searchSpinner) searchSpinner.classList.add('hidden');
-                }
-            };
             
             /**
              * Performs the search request.
              */
             const performSearch = async (searchTerm) => {
-                if (!postsContainer || !searchSpinner || !searchError) return;
+                if (!postsContainer || !searchSpinner || !searchError) return; // Ensure elements exist
             
-                if (currentSearchController) { currentSearchController.abort(); }
-                currentSearchController = new AbortController();
+                // Abort previous pending search request if any
+                if (currentSearchController) {
+                    currentSearchController.abort();
+                    console.log("Aborted previous search request.");
+                }
+                currentSearchController = new AbortController(); // Create a new controller for this request
                 const signal = currentSearchController.signal;
             
-                searchSpinner.classList.remove('hidden');
-                searchError.textContent = ''; searchError.classList.add('hidden');
+                searchSpinner.classList.remove('hidden'); // Show spinner
+                searchError.textContent = '';
+                searchError.classList.add('hidden');
             
                 const trimmedSearchTerm = searchTerm.trim();
             
-                // --- MODIFIED BLOCK for empty search ---
+                // --- Handle Cleared Search ---
                 if (trimmedSearchTerm === '') {
                     console.log("Search cleared, reloading initial feed page.");
-                    // Hide search spinner FIRST, then call fetch/render
-                    searchSpinner.classList.add('hidden');
-                    // Call the function to fetch offset 0 and REPLACE the container
+                    searchSpinner.classList.add('hidden'); // Hide search spinner first
+                    // Remove infinite scroll listener while reloading
+                    window.removeEventListener('scroll', throttledScrollHandler);
+                    // Call fetchAndRenderFeedPage to fetch offset 0 and REPLACE the container
+                    // This function will re-initialize infinite scroll internally upon completion
                     await fetchAndRenderFeedPage(0, postsPerLoad, true);
-                    initializeInfiniteScroll();
-                    // No need for initialize* calls here, fetchAndRenderFeedPage handles it
-                    currentSearchController = null; // Clear controller since request is done (or will be handled by fetchAndRender)
+                    currentSearchController = null; // Clear controller for this finished action
                     return; // Exit function after starting the reload
                 }
-                // --- END MODIFIED BLOCK ---
             
-                // --- Perform actual search ---
+                // --- Perform Actual Search ---
                 const query = encodeURIComponent(trimmedSearchTerm);
                 console.log(`Performing search for: ${trimmedSearchTerm}`);
                 try {
-                    // Use signal for the actual search request
+                    // Use signal to allow aborting this specific fetch
                     const response = await fetch(`/api/posts/search?q=${query}`, { signal });
+            
+                    // Check if aborted before processing response
+                    if (signal.aborted) {
+                        console.log("Search request aborted before response processed.");
+                        return; // Don't process if aborted
+                    }
+            
                     if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
                     const data = await response.json();
             
                     if (data.success) {
-                        renderSearchResults(data.posts); // Render search results (which calls renderPosts(..., true))
+                        renderPosts(data.posts, true); // Replace content with search results
+                        // --- After search results, disable infinite scroll ---
+                         window.removeEventListener('scroll', throttledScrollHandler); // Remove scroll listener
+                         noMorePosts = true; // Assume search results are final (not implementing infinite scroll for search)
+                         if(loadingIndicator) loadingIndicator.style.display = 'none'; // Hide inf scroll indicator
+                         console.log("Infinite scroll disabled after search.");
                     } else {
                         searchError.textContent = data.message || 'Search failed.';
                         searchError.classList.remove('hidden');
                         if(postsContainer) postsContainer.innerHTML = ''; // Clear posts on search error
                     }
                 } catch (error) {
-                    if (error.name === 'AbortError') { console.log('Search request aborted.'); }
-                    else { console.error('Search network error:', error); searchError.textContent = 'Error performing search.'; searchError.classList.remove('hidden'); if(postsContainer) postsContainer.innerHTML = ''; }
+                    if (error.name === 'AbortError') {
+                        console.log('Search request aborted.'); // Normal, expected behaviour
+                    } else {
+                        console.error('Search network error:', error);
+                        searchError.textContent = 'Error performing search.';
+                        searchError.classList.remove('hidden');
+                        if(postsContainer) postsContainer.innerHTML = ''; // Clear posts on network error
+                    }
                 } finally {
                     searchSpinner.classList.add('hidden');
-                    // Check if this specific request was aborted before clearing controller
-                     if (signal && !signal.aborted) {
-                         currentSearchController = null;
-                     } else if (!signal) { // Fallback if signal wasn't defined for some reason
-                         currentSearchController = null;
-                     }
+                    // Clear controller only if this specific request wasn't aborted by a newer one
+                    if (currentSearchController && currentSearchController.signal === signal) {
+                        currentSearchController = null;
+                    }
                 }
             };
             
@@ -1246,16 +1230,12 @@ const initializeFollowListTriggers = () => {
 
 // --- Infinite Scroll Functionality ---
 
-const feedPostsContainer = document.getElementById('feed-posts-container');
-const loadingIndicator = document.getElementById('loading-indicator');
-const searchInput = document.getElementById('search-input');
-const searchSpinner = document.getElementById('search-spinner');
-const searchError = document.getElementById('search-error');
-let isLoadingPosts = false;
-let noMorePosts = false;
-const postsPerLoad = 5; // Or your defined limit
-let searchTimeoutId = null;
-let currentSearchController = null;
+const feedPostsContainer = document.getElementById('feed-posts-container'); // Container for posts
+const loadingIndicator = document.getElementById('loading-indicator'); // Loading indicator element
+let isLoadingPosts = false; // Flag to prevent multiple loads
+let noMorePosts = false; // Flag to stop loading
+let currentPostOffset = 0; // Start with offset 0
+const postsPerLoad = 5; // Should match FeedController::DEFAULT_LIMIT
 
 /**
  * Renders new posts fetched via infinite scroll.
@@ -1311,7 +1291,7 @@ const renderMorePosts = (posts, replace = false) => {
                 </div>
 
                 <div class="post-content-area px-4 ${ post.content ? 'pb-4' : 'pb-1'}">
-                   ${ post.content ? `<div class="post-display-content max-w-none dark:text-gray-200">${nl2br(escapeHtml(post.content))}</div>` : ''}
+                   ${ post.content ? `<div class="post-display-content prose prose-sm dark:prose-invert max-w-none">${nl2br(escapeHtml(post.content))}</div>` : ''}
                    ${ isAuthor ? `
                        <form class="post-edit-form hidden mt-2" data-post-id="${post.post_id}">
                            <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
@@ -1408,7 +1388,6 @@ const loadMorePosts = async () => {
 
     // Calculate the offset based on the *current* number of posts displayed
     const currentPostCount = feedPostsContainer.querySelectorAll('article[data-post-container-id]').length;
-    await fetchAndRenderFeedPage(currentPostCount, postsPerLoad, false);
     const offsetToLoad = currentPostCount; // Next offset is the current count
 
     console.log(`Loading more posts... Offset: ${offsetToLoad}, Limit: ${postsPerLoad}`);
@@ -1459,21 +1438,25 @@ const loadMorePosts = async () => {
  */
 let scrollTimeout; // Define timeout variable outside handler
 const throttledScrollHandler = () => {
-     if (scrollTimeout) return; // Don't run if already waiting for timeout
+    if (scrollTimeout) return; // Don't run if already waiting for timeout
+    scrollTimeout = setTimeout(() => {
+       scrollTimeout = null; // Reset timeout ID so it can run again
+       handleScroll(); // Execute the actual scroll check
+    }, 250); // Check scroll position at most every 250ms
+};
 
-     scrollTimeout = setTimeout(() => {
-        // Reset timeout ID so it can run again
-         scrollTimeout = null;
 
-         // Check if user is near the bottom
-         const scrollThreshold = 350; // Pixels from bottom to trigger load (increase slightly?)
-         if (!isLoadingPosts && !noMorePosts && (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold)) {
-            console.log("Scroll threshold met, calling loadMorePosts.");
-            loadMorePosts();
-         }
-     }, 250); // Check scroll position at most every 250ms
- };
+ const handleScroll = () => {
+    // Exit conditions: already loading, no more posts, elements missing
+    if (isLoadingPosts || noMorePosts || !feedPostsContainer || !loadingIndicator) return;
 
+    // Check if user is near the bottom of the page
+    const scrollThreshold = 350; // Pixels from bottom to trigger load
+    if ((window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - scrollThreshold)) {
+       console.log("Scroll threshold met, calling loadMorePosts.");
+       loadMorePosts(); // Call the function that fetches/appends
+    }
+};
 
 /**
  * Initializes Infinite Scroll functionality.
@@ -1485,95 +1468,52 @@ const initializeInfiniteScroll = () => {
         return;
     }
 
-     // Determine initial state based on PHP render
+     // Determine initial state based on posts rendered by PHP
      const initialPostCount = feedPostsContainer.querySelectorAll('article[data-post-container-id]').length;
-     console.log("Initial post count:", initialPostCount);
+     console.log("Init Infinite Scroll - Initial Post Count:", initialPostCount);
 
-     // If initial load is less than limit, assume no more posts
+     // Remove previous listener before adding a new one (safety check)
+     window.removeEventListener('scroll', throttledScrollHandler);
+
+     // Reset state flags for initialization
+     noMorePosts = false;
+     isLoadingPosts = false;
+     loadingIndicator.style.display = 'none'; // Ensure indicator is hidden initially
+     loadingIndicator.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Loading more posts...</p>'; // Reset text
+
+     // Check if the initial PHP load brought fewer posts than the limit
      if (initialPostCount < postsPerLoad) {
-        noMorePosts = true;
-         loadingIndicator.innerHTML = '<p class="text-muted-foreground text-sm py-4">End of feed.</p>';
-         loadingIndicator.style.display = 'block';
-         console.log("Initial load has less posts than limit, infinite scroll inactive.");
+        noMorePosts = true; // Assume no more posts if first page isn't full
+        loadingIndicator.innerHTML = '<p class="text-muted-foreground text-sm py-4">End of feed.</p>';
+        loadingIndicator.style.display = 'block'; // Show "End of feed"
+        console.log("Initial load < limit, infinite scroll inactive.");
      } else {
-        // Only add scroll listener if there are potentially more posts
-         console.log("Initializing infinite scroll listener.");
-         noMorePosts = false; // Ensure it's false initially
-         isLoadingPosts = false; // Ensure it's false initially
-         window.addEventListener('scroll', throttledScrollHandler);
-          // Initial check in case the first page doesn't fill the screen
-          handleScroll(); // Call handleScroll once to check initial state
+        // Only add scroll listener if more posts *might* exist
+        console.log("Initializing infinite scroll listener.");
+        window.addEventListener('scroll', throttledScrollHandler);
+        // Check immediately if the viewport isn't filled
+        // Use timeout to let the browser render layout first
+        setTimeout(handleScroll, 150);
      }
 };
 
 const initialFeedContainer = document.getElementById('feed-posts-container');
 
-const loadInitialPosts = async () => {
-    if (!initialFeedContainer) return;
 
-    const initialStatus = initialFeedContainer.querySelector('.initial-load-status');
-    const skeletonPosts = initialFeedContainer.querySelectorAll('.animate-pulse'); // Select skeletons
-
-    // Check if skeletons are present (meaning PHP didn't render posts)
-    if (skeletonPosts.length === 0) {
-         console.log("Initial posts already rendered by PHP or container empty, skipping initial AJAX load.");
-         initializeInfiniteScroll(); // Still initialize infinite scroll based on existing content
-         return;
-    }
-
-    if (initialStatus) initialStatus.classList.remove('hidden'); // Show "Loading posts..." text
-    console.log("Fetching initial posts...");
-
-    try {
-         // Fetch first page (offset 0)
-         const response = await fetch(`${APP_BASE_URL}/?ajax=1&offset=0&limit=${postsPerLoad}`);
-         const data = await response.json();
-
-         if (!response.ok || !data.success) {
-             throw new Error(data.message || 'Failed to load initial posts');
-         }
-
-         // --- Remove Skeletons & Render Posts ---
-         skeletonPosts.forEach(sk => sk.remove()); // Remove all skeleton elements
-         if (initialStatus) initialStatus.remove(); // Remove loading text
-
-         if (data.posts && data.posts.length > 0) {
-             renderMorePosts(data.posts); // Use the same function to render and attach listeners
-             // If fewer posts than limit returned, no more posts exist
-             if (data.posts.length < postsPerLoad) {
-                 noMorePosts = true;
-                 loadingIndicator.innerHTML = '<p class="text-muted-foreground text-sm py-4">End of feed.</p>';
-                 loadingIndicator.style.display = 'block';
-             }
-         } else {
-             // API returned success but no posts
-             initialFeedContainer.innerHTML = '<p class="text-center text-muted-foreground py-10">No posts found.</p>';
-             noMorePosts = true; // Set flag as there are no posts at all
-         }
-
-    } catch (error) {
-         console.error("Error loading initial posts:", error);
-         if (initialFeedContainer) initialFeedContainer.innerHTML = `<p class="text-center text-destructive py-10">Error loading feed. Please try refreshing.</p>`;
-         noMorePosts = true; // Stop infinite scroll on initial load error
-    } finally {
-        // Initialize infinite scroll AFTER initial load completes or fails
-        initializeInfiniteScroll();
-    }
-};
-
-
+// --- Update DOMContentLoaded Listener ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired.");
     initializeTheme();
     initializeLikeButtons();
     initializeComments();
-    initializeFollowButtons(); // For buttons outside modal
+    initializeFollowButtons();
     initializePostOptions();
     initializeNotifications();
     initializeSearch();
     initializeAiFeatures();
-    // initializeInfiniteScroll(); // Called by loadInitialPosts now
-    loadInitialPosts();
+    initializeFollowListTriggers();
+    initializeInfiniteScroll(); // <-- Call infinite scroll init directly
+    // REMOVED: loadInitialPosts();
 });
 
-console.log('Bailanysta app.js script parsed.');
+console.log('Bailanysta app.js script parsed (Includes Skeletons & Initial Load).');
