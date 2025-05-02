@@ -4,7 +4,7 @@ $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null;
 $isAuthor = ($currentUserId !== null && isset($post['author_id']) && $currentUserId === $post['author_id']);
 
 // Determine Author Avatar Source
-$authorAvatarSrc = 'https://via.placeholder.com/40/cccccc/969696?text='; // Default
+$authorAvatarSrc = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541'; // Default
 if (!empty($post['author_picture_url'])) {
     if (str_starts_with($post['author_picture_url'], '/uploads/users/')) {
          $authorAvatarSrc = BASE_URL . $post['author_picture_url']; // Local path
@@ -93,7 +93,7 @@ if (!empty($post['author_picture_url'])) {
          <?php if ($isLoggedIn): ?>
              <?php
                 // Determine Current User Avatar Source for comment form
-                $currentUserCommentAvatarSrc = 'https://via.placeholder.com/32/cccccc/969696?text='; // Default
+                $currentUserCommentAvatarSrc = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541'; // Default
                 if (!empty($_SESSION['user']['picture_url']) && str_starts_with($_SESSION['user']['picture_url'], '/uploads/users/')) {
                     $currentUserCommentAvatarSrc = BASE_URL . $_SESSION['user']['picture_url'];
                 }

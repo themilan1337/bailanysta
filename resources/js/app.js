@@ -1291,10 +1291,10 @@ const renderMorePosts = (posts, replace = false) => {
         const commentButtonDisabled = !isLoggedIn ? 'disabled title="Login to comment"' : '';
 
         // Prepare image URLs
-        let authorPicSrc = post.author_picture_url || 'https://via.placeholder.com/40/cccccc/969696?text=';
+        let authorPicSrc = post.author_picture_url || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541';
         if (authorPicSrc && authorPicSrc.startsWith('/')) { authorPicSrc = APP_BASE_URL + authorPicSrc; }
         authorPicSrc = escapeHtml(authorPicSrc);
-        const currentUserPicSrc = escapeHtml(sessionUserPictureUrl || 'https://via.placeholder.com/32/cccccc/969696?text=');
+        const currentUserPicSrc = escapeHtml(sessionUserPictureUrl || 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541');
         let postImageSrc = post.image_url ? APP_BASE_URL + escapeHtml(post.image_url) : null;
 
         // --- FULL HTML STRUCTURE ---

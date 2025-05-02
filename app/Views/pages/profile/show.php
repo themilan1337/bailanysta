@@ -4,7 +4,7 @@ $viewerIsFollowing = $user['viewer_is_following'] ?? false;
 $currentUserId = $isLoggedIn ? ($_SESSION['user']['id'] ?? null) : null;
 
 // Determine Profile User Avatar Source
-$profileAvatarSrc = 'https://via.placeholder.com/96/cccccc/969696?text='; // Default
+$profileAvatarSrc = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541'; // Default
 if (!empty($user['picture_url'])) {
     if (str_starts_with($user['picture_url'], '/uploads/users/')) {
          $profileAvatarSrc = BASE_URL . $user['picture_url']; // Local path
@@ -111,11 +111,11 @@ if (!empty($user['picture_url'])) {
                     </button>
                 </div>
 
-                 <div class="mt-4">
+                 <!-- <div class="mt-4">
                      <label for="post_image_profile" class="block text-sm font-medium text-muted-foreground mb-1">Attach Image (Optional)</label>
                      <input type="file" name="post_image" id="post_image_profile" accept="image/jpeg, image/png, image/gif, image/webp" class="block w-full text-sm text-muted-foreground border border-input rounded-md cursor-pointer bg-background focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90">
                      <p class="text-xs text-muted-foreground mt-1">Max file size: 2MB.</p>
-                </div>
+                    </div> -->
                  <div class="flex justify-end mt-3">
                      <button type="submit"
                              class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3">

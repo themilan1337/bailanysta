@@ -4,7 +4,7 @@
    $isLoggedIn = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
    
    // Determine Header Avatar Source
-   $headerAvatarSrc = 'https://via.placeholder.com/32/cccccc/969696?text='; // Default placeholder
+   $headerAvatarSrc = 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png?20150327203541'; // Default placeholder
    if ($isLoggedIn && !empty($_SESSION['user']['picture_url'])) {
        if (str_starts_with($_SESSION['user']['picture_url'], '/uploads/users/')) {
             $headerAvatarSrc = BASE_URL . $_SESSION['user']['picture_url']; // Local path
