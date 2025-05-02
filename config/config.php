@@ -1,7 +1,7 @@
 <?php
 
 // +5gmt
-date_default_timezone_set("Asia/Karachi");
+date_default_timezone_set("Atlantic/Reykjavik");
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
