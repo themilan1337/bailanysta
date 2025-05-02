@@ -1,5 +1,7 @@
 // resources/js/app.js
 
+import '../img/rocket.png';
+
 const APP_BASE_URL = typeof BASE_URL !== 'undefined' ? BASE_URL : '';
 const sessionUserPictureUrl = typeof SESSION_USER_PICTURE !== 'undefined' ? SESSION_USER_PICTURE : null;
 
@@ -120,7 +122,7 @@ function nl2br(str) {
                         method: method,
                         headers: {
                             'Accept': 'application/json',
-                            'X-CSRF-TOKEN': CSRF_TOKEN
+                            
                         }
                     });
                     const data = await response.json();
@@ -266,7 +268,7 @@ function nl2br(str) {
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
-                            'X-CSRF-TOKEN': CSRF_TOKEN
+                            
                         },
                         body: JSON.stringify(payload)
                     });
@@ -336,7 +338,7 @@ function nl2br(str) {
                         method: method,
                         headers: {
                             'Accept': 'application/json',
-                            'X-CSRF-TOKEN': CSRF_TOKEN
+                            
                         }
                     });
                     const data = await response.json();
@@ -486,7 +488,7 @@ function nl2br(str) {
                         method: 'DELETE',
                         headers: {
                             'Accept': 'application/json',
-                            'X-CSRF-TOKEN': CSRF_TOKEN
+                            
                         }
                     });
                     const data = await response.json();
@@ -681,6 +683,52 @@ function nl2br(str) {
                     if (markAllReadButton) markAllReadButton.disabled = true;
                 }
             };
+
+            const fetchAndRenderFeedPage = async (offset = 0, limit = postsPerLoad, replace = false) => {
+                // Prevent fetching if already loading (might need refinement if called concurrently)
+                if (isLoadingPosts && !replace) return;
+            
+                isLoadingPosts = true;
+                if (loadingIndicator) loadingIndicator.style.display = 'flex'; // Show loader
+            
+                console.log(`Fetching posts: Offset=${offset}, Limit=${limit}, Replace=${replace}`);
+            
+                try {
+                    const response = await fetch(`${APP_BASE_URL}/?ajax=1&offset=${offset}&limit=${limit}`);
+                    const data = await response.json();
+            
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || 'Failed to load feed data');
+                    }
+            
+                    // Call the existing render function
+                    renderMorePosts(data.posts || [], replace); // Pass replace flag
+            
+                    // If replacing content (offset 0), re-initialize infinite scroll state
+                    if (replace) {
+                        initializeInfiniteScroll(); // Reset scroll listener and flags
+                    } else if (data.posts.length < limit) {
+                        // If appending and got fewer than requested, assume end of feed
+                        noMorePosts = true;
+                        if(loadingIndicator) {
+                            loadingIndicator.innerHTML = '<p class="text-muted-foreground text-sm text-center py-4">End of feed.</p>';
+                            loadingIndicator.style.display = 'flex'; // Keep end message visible
+                        }
+                    }
+            
+                } catch (error) {
+                    console.error("Error in fetchAndRenderFeedPage:", error);
+                    if(loadingIndicator) loadingIndicator.innerHTML = '<p class="text-destructive text-sm text-center py-4">Error loading feed.</p>';
+                    noMorePosts = true; // Stop trying on error
+                } finally {
+                    isLoadingPosts = false;
+                    // Hide indicator only if appending and there *might* be more posts
+                    if (!replace && !noMorePosts && loadingIndicator) {
+                        loadingIndicator.style.display = 'none';
+                    }
+                     // If replacing or end of feed, the indicator text/state is handled within try/catch
+                }
+            };
             
             /**
              * Marks notifications as read via API.
@@ -823,8 +871,8 @@ function nl2br(str) {
                                           <div class="relative post-options-dropdown">
                                              <button type="button" aria-label="Post options" class="post-options-button p-1 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM10 8.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM11.5 15.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" /></svg></button>
                                              <div class="post-options-menu hidden absolute right-0 mt-1 w-36 bg-popover border rounded-md shadow-lg z-10 py-1 text-sm">
-                                                <button type="button" class="post-edit-button block w-full text-left px-3 py-1.5 text-foreground hover:bg-accent">Edit Post</button>
-                                                <button type="button" class="post-delete-button block w-full text-left px-3 py-1.5 text-destructive hover:bg-destructive/10">Delete Post</button>
+                                                <button type="button" class="post-edit-button cursor-pointer block w-full text-left px-3 py-1.5 text-foreground hover:bg-accent">Edit Post</button>
+                                                <button type="button" class="post-delete-button cursor-pointer block w-full text-left px-3 py-1.5 text-destructive hover:bg-destructive/10">Delete Post</button>
                                              </div>
                                           </div>
                                      ` : '' }
@@ -837,8 +885,8 @@ function nl2br(str) {
                                             <textarea name="content" rows="5" class="w-full p-2 border border-input bg-background rounded-md focus:ring-1 focus:ring-ring focus:outline-none resize-y placeholder:text-muted-foreground text-sm" required>${escapeHtml(post.content || '')}</textarea>
                                             <div class="flex justify-end items-center space-x-2 mt-2">
                                                 <span class="edit-status text-xs text-muted-foreground"></span>
-                                                <button type="button" class="edit-cancel-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
-                                                <button type="submit" class="edit-save-button inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Save Changes</button>
+                                                <button type="button" class="edit-cancel-button cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3">Cancel</button>
+                                                <button type="submit" class="edit-save-button cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">Save Changes</button>
                                             </div>
                                         </form>
                                         ` : '' }
@@ -861,7 +909,7 @@ function nl2br(str) {
             
                                   <div class="p-2 border-t grid grid-cols-2 gap-1">
                                         <button data-post-id="${post.post_id}" aria-label="${likeButtonAriaLabel} post" aria-pressed="${likeButtonAriaPressed}" class="${likeButtonClasses}" ${likeButtonDisabled}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="like-icon-outline w-5 h-5" style="${outlineIconStyle}"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="like-icon-outline cursor-pointer w-5 h-5" style="${outlineIconStyle}"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="like-icon-filled w-5 h-5" style="${filledIconStyle}"><path d="M9.653 16.915l-.005-.003-.019-.01a20.759 20.759 0 01-1.162-.682 22.045 22.045 0 01-2.582-1.9C4.045 12.733 2 10.352 2 7.5a4.5 4.5 0 018-2.828A4.5 4.5 0 0118 7.5c0 2.852-2.044 5.233-3.885 6.82a22.049 22.049 0 01-3.744 2.582l-.019.01-.005.003h-.002a.739.739 0 01-.69.001l-.002-.001z" /></svg>
                                             <span>Like <span class="like-count font-normal">${post.like_count}</span></span>
                                         </button>
@@ -918,15 +966,14 @@ function nl2br(str) {
             
                 // --- Handle Cleared Search ---
                 if (trimmedSearchTerm === '') {
-                    console.log("Search cleared, reloading initial feed page.");
-                    searchSpinner.classList.add('hidden'); // Hide search spinner first
-                    // Remove infinite scroll listener while reloading
+                    console.log("Search cleared, reloading initial feed page via AJAX.");
+                    searchSpinner.classList.add('hidden');
                     window.removeEventListener('scroll', throttledScrollHandler);
-                    // Call fetchAndRenderFeedPage to fetch offset 0 and REPLACE the container
-                    // This function will re-initialize infinite scroll internally upon completion
-                    await fetchAndRenderFeedPage(0, postsPerLoad, true);
-                    currentSearchController = null; // Clear controller for this finished action
-                    return; // Exit function after starting the reload
+                    // --- THIS IS THE CALL ---
+                    await fetchAndRenderFeedPage(0, postsPerLoad, true); // Ensure this line exists
+                    // -----------------------
+                    currentSearchController = null;
+                    return;
                 }
             
                 // --- Perform Actual Search ---
@@ -946,7 +993,7 @@ function nl2br(str) {
                     const data = await response.json();
             
                     if (data.success) {
-                        renderPosts(data.posts, true); // Replace content with search results
+                        renderSearchResults(data.posts); // Replace content with search results
                         // --- After search results, disable infinite scroll ---
                          window.removeEventListener('scroll', throttledScrollHandler); // Remove scroll listener
                          noMorePosts = true; // Assume search results are final (not implementing infinite scroll for search)
@@ -1041,7 +1088,7 @@ function nl2br(str) {
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
-                            'X-CSRF-TOKEN': CSRF_TOKEN
+                            
                         },
                         body: JSON.stringify(payload)
                     });
@@ -1214,33 +1261,15 @@ const initializeFollowListTriggers = () => {
              closeFollowListModal();
          }
      });
-
-    // Optional: Close on backdrop click
-    // followListModal.addEventListener('click', (event) => {
-    //      if (event.target === followListModal) { closeFollowListModal(); }
-    //  });
-
-
-      console.log("Follow list trigger listeners attached.");
 };
 
+const feedPostsContainer = document.getElementById('feed-posts-container');
+const loadingIndicator = document.getElementById('loading-indicator');
+let isLoadingPosts = false; 
+let noMorePosts = false;
+let currentPostOffset = 0;
+const postsPerLoad = 5; // match FeedController::DEFAULT_LIMIT
 
-// resources/js/app.js
-// ... (Existing code: Globals, Helpers, Theme, Like, Comment, Follow, Edit, Delete, Search, Notification logic) ...
-
-// --- Infinite Scroll Functionality ---
-
-const feedPostsContainer = document.getElementById('feed-posts-container'); // Container for posts
-const loadingIndicator = document.getElementById('loading-indicator'); // Loading indicator element
-let isLoadingPosts = false; // Flag to prevent multiple loads
-let noMorePosts = false; // Flag to stop loading
-let currentPostOffset = 0; // Start with offset 0
-const postsPerLoad = 5; // Should match FeedController::DEFAULT_LIMIT
-
-/**
- * Renders new posts fetched via infinite scroll.
- * Uses the simplified JS rendering approach. Re-initializes listeners.
- */
 const renderMorePosts = (posts, replace = false) => {
     if (!feedPostsContainer || !posts) return;
 
@@ -1258,7 +1287,7 @@ const renderMorePosts = (posts, replace = false) => {
         const outlineIconStyle = `display: ${post.user_liked ? 'none' : 'block'};`;
         const filledIconStyle = `display: ${post.user_liked ? 'block' : 'none'};`;
 
-        const commentButtonClasses = `comment-toggle-button flex items-center justify-center space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground hover:bg-accent transition-colors ${!isLoggedIn ? 'cursor-not-allowed opacity-60' : ''}`;
+        const commentButtonClasses = `comment-toggle-button flex items-center justify-center cursor-pointer space-x-1.5 py-1.5 px-3 rounded-md text-muted-foreground hover:bg-accent transition-colors ${!isLoggedIn ? 'cursor-not-allowed opacity-60' : ''}`;
         const commentButtonDisabled = !isLoggedIn ? 'disabled title="Login to comment"' : '';
 
         // Prepare image URLs
@@ -1358,37 +1387,29 @@ const renderMorePosts = (posts, replace = false) => {
             feedPostsContainer.appendChild(newPostElement);
             // Use requestAnimationFrame for smoother fade-in trigger
             requestAnimationFrame(() => {
-                 requestAnimationFrame(() => { // Double requestAnimationFrame for better browser rendering consistency
+                 requestAnimationFrame(() => {
                      newPostElement.classList.remove('opacity-0');
                  });
             });
         });
     }
 
-    // Re-initialize listeners for the potentially new content
     initializeLikeButtons();
     initializeComments();
     initializePostOptions();
 };
 
-
-/**
- * Fetches and appends more posts to the feed.
- */
 const loadMorePosts = async () => {
-    // Exit conditions: already loading, no more posts, elements missing
     if (isLoadingPosts || noMorePosts || !feedPostsContainer || !loadingIndicator) {
-        // console.log("Load More Posts: Skipped (Loading:", isLoadingPosts, "No More:", noMorePosts, ")");
         return;
     }
 
     isLoadingPosts = true;
-    loadingIndicator.style.display = 'block'; // Show loading indicator
-    loadingIndicator.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Loading more posts...</p>'; // Reset text
+    loadingIndicator.style.display = 'block';
+    loadingIndicator.innerHTML = '<p class="text-gray-500 dark:text-gray-400">Loading more posts...</p>';
 
-    // Calculate the offset based on the *current* number of posts displayed
     const currentPostCount = feedPostsContainer.querySelectorAll('article[data-post-container-id]').length;
-    const offsetToLoad = currentPostCount; // Next offset is the current count
+    const offsetToLoad = currentPostCount;
 
     console.log(`Loading more posts... Offset: ${offsetToLoad}, Limit: ${postsPerLoad}`);
 
@@ -1500,6 +1521,36 @@ const initializeInfiniteScroll = () => {
 const initialFeedContainer = document.getElementById('feed-posts-container');
 
 
+const initializeMobileMenu = () => {
+    const menuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const openIcon = document.getElementById('menu-icon-open');
+    const closeIcon = document.getElementById('menu-icon-close');
+
+    if (!menuButton || !mobileMenu || !openIcon || !closeIcon) return;
+
+    console.log("Initializing mobile menu...");
+
+    menuButton.addEventListener('click', () => {
+        const isExpanded = menuButton.getAttribute('aria-expanded') === 'true';
+        mobileMenu.classList.toggle('hidden');
+        openIcon.classList.toggle('hidden', !isExpanded); // Show open icon when menu is hidden
+        closeIcon.classList.toggle('hidden', isExpanded); // Show close icon when menu is visible
+        menuButton.setAttribute('aria-expanded', !isExpanded);
+    });
+
+    // Optional: Close menu when a link inside it is clicked
+    mobileMenu.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+             mobileMenu.classList.add('hidden');
+             openIcon.classList.remove('hidden');
+             closeIcon.classList.add('hidden');
+             menuButton.setAttribute('aria-expanded', 'false');
+        });
+    });
+     console.log("Mobile menu listeners attached.");
+};
+
 // --- Update DOMContentLoaded Listener ---
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOMContentLoaded event fired.");
@@ -1512,8 +1563,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeSearch();
     initializeAiFeatures();
     initializeFollowListTriggers();
-    initializeInfiniteScroll(); // <-- Call infinite scroll init directly
-    // REMOVED: loadInitialPosts();
+    initializeInfiniteScroll();
+    initializeMobileMenu();
 });
-
-console.log('Bailanysta app.js script parsed (Includes Skeletons & Initial Load).');

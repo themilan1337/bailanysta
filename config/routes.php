@@ -11,55 +11,56 @@ use App\Controllers\NotificationController;
 use App\Controllers\AiController;
 /**
  * Defines the application routes.
- * The $r variable is an instance of FastRoute\RouteCollector provided by public/index.php
  *
  * @var FastRoute\RouteCollector $r
  */
 
-// --- Page Routes ---
-$r->addRoute('GET', '/', [FeedController::class, 'index']); // Main feed/homepage
-$r->addRoute('GET', '/profile', [ProfileController::class, 'show']); // View own profile
-$r->addRoute('GET', '/profile/{userId:\d+}', [ProfileController::class, 'showById']); // View other users' profiles by ID
+// --- pages ---
+$r->addRoute('GET', '/', [FeedController::class, 'index']);
+$r->addRoute('GET', '/profile', [ProfileController::class, 'show']);
+$r->addRoute('GET', '/profile/{userId:\d+}', [ProfileController::class, 'showById']);
 
-// --- Authentication Routes ---
-$r->addRoute('GET', '/auth/google', [AuthController::class, 'redirectToGoogle']); // Redirect to Google for login
-$r->addRoute('GET', '/auth/google/callback', [AuthController::class, 'handleGoogleCallback']); // Handle callback from Google
-$r->addRoute('GET', '/logout', [AuthController::class, 'logout']); // Logout user
+// --- auth ---
+$r->addRoute('GET', '/auth/google', [AuthController::class, 'redirectToGoogle']);
+$r->addRoute('GET', '/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+$r->addRoute('GET', '/logout', [AuthController::class, 'logout']);
 
-// --- Profile Action Routes (Form Submissions) ---
-$r->addRoute('POST', '/profile/update', [ProfileController::class, 'update']); // Handle nickname update form
-$r->addRoute('POST', '/profile/delete', [ProfileController::class, 'destroy']); // Handle account deletion form
+// --- profile actions ---
+$r->addRoute('POST', '/profile/update', [ProfileController::class, 'update']);
+$r->addRoute('POST', '/profile/delete', [ProfileController::class, 'destroy']);
 
-// --- Post Action Routes (Form Submissions) ---
-$r->addRoute('POST', '/profile/posts', [ProfileController::class, 'storePost']); // Handle create post form submission
+// --- from submissions ---
+$r->addRoute('POST', '/profile/posts', [ProfileController::class, 'storePost']);
 
 // --- API Routes ---
 
 // Likes API
-$r->addRoute('POST', '/api/posts/{id:\d+}/like', [PostController::class, 'like']); // Like a post
-$r->addRoute('DELETE', '/api/posts/{id:\d+}/like', [PostController::class, 'unlike']); // Unlike a post
+$r->addRoute('POST', '/api/posts/{id:\d+}/like', [PostController::class, 'like']);
+$r->addRoute('DELETE', '/api/posts/{id:\d+}/like', [PostController::class, 'unlike']);
 
 // Comments API
-$r->addRoute('GET', '/api/posts/{postId:\d+}/comments', [CommentController::class, 'index']); // Get comments for a post
-$r->addRoute('POST', '/api/posts/{postId:\d+}/comments', [CommentController::class, 'store']); // Add a comment to a post
-// $r->addRoute('DELETE', '/api/comments/{id:\d+}', [CommentController::class, 'destroy']); // Optional: Delete comment route
+$r->addRoute('GET', '/api/posts/{postId:\d+}/comments', [CommentController::class, 'index']);
+$r->addRoute('POST', '/api/posts/{postId:\d+}/comments', [CommentController::class, 'store']);
+// $r->addRoute('DELETE', '/api/comments/{id:\d+}', [CommentController::class, 'destroy']); todo: implement frontend delete comment
 
 // Posts API (Update)
 $r->addRoute('POST', '/api/posts/{id:\d+}/update', [PostController::class, 'update']);
-$r->addRoute('DELETE', '/api/posts/{id:\d+}', [PostController::class, 'destroy']); // <-- Add Delete Route
+$r->addRoute('DELETE', '/api/posts/{id:\d+}', [PostController::class, 'destroy']);
 
-// Follows API
-$r->addRoute('POST', '/api/users/{userId:\d+}/follow', [UserController::class, 'follow']); // Follow a user
-$r->addRoute('DELETE', '/api/users/{userId:\d+}/follow', [UserController::class, 'unfollow']); // Unfollow a user
+// --- follows API ---
+$r->addRoute('POST', '/api/users/{userId:\d+}/follow', [UserController::class, 'follow']);
+$r->addRoute('DELETE', '/api/users/{userId:\d+}/follow', [UserController::class, 'unfollow']);
 
-// --- NOTIFICATION API Routes (New) ---
-$r->addRoute('GET', '/api/notifications', [NotificationController::class, 'index']); // Get unread notifications (or all recent)
-$r->addRoute('POST', '/api/notifications/mark-read', [NotificationController::class, 'markRead']); // Mark notifications as read
+// --- notifications API ---
+$r->addRoute('GET', '/api/notifications', [NotificationController::class, 'index']);
+$r->addRoute('POST', '/api/notifications/mark-read', [NotificationController::class, 'markRead']);
 
+// --- Search API Routes ---
 $r->addRoute('GET', '/api/posts/search', [FeedController::class, 'search']);
 
+// --- AI API Routes ---
 $r->addRoute('POST', '/api/ai/generate-post-idea', [AiController::class, 'generatePostIdea']);
 
+// --- User API Routes ---
 $r->addRoute('GET', '/api/users/{userId:\d+}/followers', [UserController::class, 'getFollowers']);
-// Get list of users the specified user is following
 $r->addRoute('GET', '/api/users/{userId:\d+}/following', [UserController::class, 'getFollowing']);

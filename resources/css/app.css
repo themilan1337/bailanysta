@@ -1,17 +1,15 @@
 /* resources/css/app.css */
 
-/* Import base Tailwind styles FIRST */
+@import url(https://fonts.googleapis.com/css?family=Inter:100,200,300,regular,500,600,700,800,900,100italic,200italic,300italic,italic,500italic,600italic,700italic,800italic,900italic);
+
+html, body {
+    font-family: 'Inter', sans-serif;
+}
+
 @import "tailwindcss";
 
-/*
- * Define custom theme tokens using @theme.
- * These variables inform Tailwind about your design system (colors, radius, etc.)
- * Tailwind uses these to generate utilities where applicable (e.g., bg-primary from --color-primary).
- * We define the LIGHT theme values here.
-*/
 @theme {
-    /* Colors (shadcn zinc palette - light mode) */
-    --color-background: oklch(100% 0 0); /* Use oklch or hex/rgb */
+    --color-background: oklch(100% 0 0);
     --color-foreground: oklch(20.37% 0.027 260.17);
     --color-card: oklch(100% 0 0);
     --color-card-foreground: oklch(20.37% 0.027 260.17);
@@ -29,20 +27,15 @@
     --color-destructive-foreground: oklch(97.14% 0.006 255.86);
     --color-border: oklch(89.76% 0.012 257.24);
     --color-input: oklch(89.76% 0.012 257.24);
-    --color-ring: oklch(20.37% 0.027 260.17); /* Focus ring color */
+    --color-ring: oklch(20.37% 0.027 260.17);
 
-    /* Border Radius */
     --radius-sm: 0.125rem;
     --radius-md: 0.375rem;
-    --radius-lg: 0.5rem; /* Used for cards, buttons etc. */
+    --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
     --radius-2xl: 1rem;
 }
 
-/*
- * Use @layer base for standard CSS overrides and dark mode variables.
- * These variables override the values defined by @theme when .dark is active.
-*/
 @layer base {
     /* Dark Mode Variable Overrides */
     .dark {

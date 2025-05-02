@@ -1,5 +1,4 @@
 <?php
-// app/Controllers/UserController.php
 
 namespace App\Controllers;
 
@@ -28,19 +27,18 @@ class UserController
      * POST /api/users/{userId}/follow
      * @param int $userId The ID of the user to follow (Matches route parameter name)
      */
-    public function follow(int $userId): void // <-- CHANGED Parameter name
+    public function follow(int $userId): void
     {
-        $this->handleFollowUnfollow($userId, true); // <-- Pass $userId
+        $this->handleFollowUnfollow($userId, true);
     }
 
     /**
      * Unfollow a user.
-     * DELETE /api/users/{userId}/follow
      * @param int $userId The ID of the user to unfollow (Matches route parameter name)
      */
-    public function unfollow(int $userId): void // <-- CHANGED Parameter name
+    public function unfollow(int $userId): void
     {
-         $this->handleFollowUnfollow($userId, false); // <-- Pass $userId
+         $this->handleFollowUnfollow($userId, false);
     }
 
     public function getFollowers(int $userId): void
@@ -60,13 +58,10 @@ class UserController
             http_response_code(500); echo json_encode(['success' => false, 'message' => 'DB error.', 'users' => []]); exit;
         }
 
-        // Determine which column to join on based on type
         $joinColumn = ($type === 'followers') ? 'f.follower_id' : 'f.following_id';
         $whereColumn = ($type === 'followers') ? 'f.following_id' : 'f.follower_id';
 
         try {
-             // Select basic user info of the followers/following
-             // Also check if the *current logged-in user* is following *each person* in the list
              $sql = "SELECT
                         u.id, u.name, u.nickname, u.picture_url";
 
@@ -74,13 +69,13 @@ class UserController
                  $sql .= ", (SELECT COUNT(*) FROM follows f_check
                             WHERE f_check.follower_id = :current_user_id AND f_check.following_id = u.id) > 0 AS viewer_is_following";
              } else {
-                 $sql .= ", 0 AS viewer_is_following"; // Default if not logged in
+                 $sql .= ", 0 AS viewer_is_following";
              }
 
              $sql .= " FROM users u
                       JOIN follows f ON u.id = {$joinColumn}
                       WHERE {$whereColumn} = :target_user_id
-                      ORDER BY f.created_at DESC"; // Show newest first, or order by name: ORDER BY u.name ASC
+                      ORDER BY f.created_at DESC";
 
              $stmt = $this->db->prepare($sql);
              $stmt->bindParam(':target_user_id', $userId, PDO::PARAM_INT);
@@ -90,7 +85,6 @@ class UserController
              $stmt->execute();
              $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-             // Ensure boolean type
              foreach($users as &$user) {
                  $user['viewer_is_following'] = (bool)$user['viewer_is_following'];
              }
@@ -115,11 +109,9 @@ class UserController
     private function handleFollowUnfollow(int $targetUserId, bool $isFollowing): void
     {
         header('Content-Type: application/json');
-        // Auth, DB, self-follow, target exists checks... (same as before)
         if ($this->currentUserId === null) { /*...*/ exit; }
         if ($this->db === null) { /*...*/ exit; }
         if ($targetUserId === $this->currentUserId) { /*...*/ exit; }
-        // ... check if target user exists ...
          error_log("[Follow/Unfollow] Target User ID: {$targetUserId}, Current User ID: {$this->currentUserId}, Action: " . ($isFollowing ? 'Follow' : 'Unfollow'));
 
 
@@ -137,14 +129,13 @@ class UserController
                  error_log("[Follow Attempt] Target User ID: {$targetUserId}, Follower ID: {$this->currentUserId}, New Follow Inserted: " . ($wasChanged ? 'Yes' : 'No (or already existed)'));
 
 
-                 // --- Check Notification Condition ---
-                 if ($wasChanged) { // Only notify if it's a new follow
+                 if ($wasChanged) {
                       error_log("[Notification Check - Follow] Conditions met (New Follow=true). Attempting notification insert...");
                       $notifyStmt = $this->db->prepare(
                           "INSERT INTO notifications (user_id, type, actor_user_id, post_id, created_at)
                            VALUES (:user_id, 'follow', :actor_user_id, NULL, NOW())"
                       );
-                      $notifySuccess = $notifyStmt->execute([ // Capture result
+                      $notifySuccess = $notifyStmt->execute([
                           ':user_id' => $targetUserId,
                           ':actor_user_id' => $this->currentUserId
                       ]);

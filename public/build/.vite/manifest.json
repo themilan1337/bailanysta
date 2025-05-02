@@ -1,11 +1,15 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-B7UvHXLZ.css",
+    "file": "assets/app-2JhLnZ91.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
+  "resources/img/rocket.png": {
+    "file": "assets/rocket-BIdtBUEw.png",
+    "src": "resources/img/rocket.png"
+  },
   "resources/js/app.js": {
-    "file": "assets/app-5crm02SA.js",
+    "file": "assets/app-BALOkk_G.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true

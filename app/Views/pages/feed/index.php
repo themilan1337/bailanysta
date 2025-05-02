@@ -23,10 +23,10 @@ $currentUser = $isLoggedIn ? ($_SESSION['user'] ?? null) : null;
     </div>
 
     <?php if ($isLoggedIn && $currentUser): ?>
-        <div class="bg-card border rounded-lg p-4 mb-6 shadow-sm">
+        <div class="bg-card border rounded-lg p-4 mb-6">
              <form action="<?php echo BASE_URL; ?>/profile/posts" method="POST" enctype="multipart/form-data" id="create-post-form-feed">
-                <?php echo csrf_field(); ?>
                 <h2 class="text-lg font-semibold mb-3 text-foreground">Create a New Post</h2>
+                
                  <textarea name="content" rows="3" class="w-full p-2 border border-input bg-background rounded-xl focus:ring-1 focus:ring-ring focus:outline-none resize-none placeholder:text-muted-foreground text-sm" placeholder="What's on your mind, <?php echo htmlspecialchars($currentUser['name']); ?>? Or generate an idea!"></textarea>
                 <div class="flex items-end space-x-2 mt-3">
                     <div class="flex-grow">

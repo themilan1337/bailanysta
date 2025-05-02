@@ -68,13 +68,10 @@ class CommentController
 
     public function store(int $postId): void
     {
-        verify_csrf_token();
         header('Content-Type: application/json');
 
-        // --- LOG RAW INPUT ---
         $requestBody = file_get_contents('php://input');
         error_log("[Comment Store - Raw Input] Received Body: " . $requestBody);
-        // --- END LOG ---
 
         if ($this->currentUserId === null) {
             http_response_code(401);

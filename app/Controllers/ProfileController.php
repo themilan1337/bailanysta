@@ -123,26 +123,63 @@ class ProfileController
         if ($this->db === null) { $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Database error. Cannot delete account.']; header('Location: ' . BASE_URL . '/profile'); exit; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Allow: POST', true, 405); $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Invalid request method for deletion.']; header('Location: ' . BASE_URL . '/profile'); exit; }
         try {
+            // --- Fetch user data BEFORE deleting to get picture_url ---
+            $stmtFetch = $this->db->prepare("SELECT picture_url FROM users WHERE id = :user_id");
+            $stmtFetch->bindParam(':user_id', $this->currentUserId, PDO::PARAM_INT);
+            $stmtFetch->execute();
+            $userToDelete = $stmtFetch->fetch(PDO::FETCH_ASSOC);
+            // --- End Fetch ---
+
+
             $this->db->beginTransaction();
+
             $stmt = $this->db->prepare("DELETE FROM users WHERE id = :user_id");
             $stmt->bindParam(':user_id', $this->currentUserId, PDO::PARAM_INT);
             $stmt->execute();
             $rowCount = $stmt->rowCount();
+
             $this->db->commit();
+
             if ($rowCount > 0) {
+                // --- Delete local avatar file AFTER successful DB deletion ---
+                if ($userToDelete && $userToDelete['picture_url'] && str_starts_with($userToDelete['picture_url'], '/uploads/users/')) {
+                     $this->deleteLocalAvatar($userToDelete['picture_url']);
+                }
+                // --- End Delete Avatar File ---
+
+                // Logout User (Destroy session)
                 $_SESSION = [];
                 if (ini_get("session.use_cookies")) { $params = session_get_cookie_params(); setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]); }
                 session_destroy();
+
                 header('Location: ' . BASE_URL . '/?deleted=true');
                 exit;
-            } else { throw new \Exception("User deletion failed, row count was zero for ID: {$this->currentUserId}"); }
+            } else { throw new \Exception("User deletion failed, row count zero for ID: {$this->currentUserId}"); }
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) { $this->db->rollBack(); }
             error_log("Error deleting account for user {$this->currentUserId}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
-            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Failed to delete account. Please try again.'];
+            $_SESSION['flash_message'] = ['type' => 'error', 'text' => 'Failed to delete account.'];
             header('Location: ' . BASE_URL . '/profile');
             exit;
         }
+    }
+
+    private function deleteLocalAvatar(?string $relativePath): void
+    {
+         if (!$relativePath || !str_starts_with($relativePath, '/uploads/users/')) return;
+
+         $basePath = dirname(__DIR__, 2) . '/public';
+         $filePath = $basePath . $relativePath;
+
+         if (file_exists($filePath) && is_file($filePath)) {
+             if (@unlink($filePath)) { // Use @ to suppress warnings if deletion fails due to permissions
+                  error_log("Deleted local avatar: " . $filePath);
+             } else {
+                  error_log("Failed to delete local avatar: " . $filePath);
+             }
+         } else {
+              error_log("Local avatar not found for deletion: " . $filePath);
+         }
     }
 
     private function getUserPosts(int $userId, int $limit = 10, int $offset = 0): array {
