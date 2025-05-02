@@ -65,10 +65,11 @@ class AiController
 
         $userPromptContext = trim($data['prompt'] ?? '');
 
-        $systemPrompt = "You are generating short social media post ideas for a platform called Bailanysta. "
-                      . "Write in a concise 'TLDR' style. Use 1-2 relevant emojis (like smiles 😊 or similar positive ones). "
-                      . "Focus on being engaging and brief (1-3 sentences). Include 1-2 relevant hashtags if appropriate. "
-                      . "Directly output only the post text idea itself, without any introductory phrases like 'Here's an idea:'.";
+        $systemPrompt = "Generate **one single, concise social media post idea** for a platform called Bailanysta. "
+                      . "Write **one single, engaging sentence** using a 'TLDR' (too long; didn't read) style. "
+                      . "Include 1-2 relevant emojis (like 😊 or 🎉). "
+                      . "Include 1-2 relevant hashtags if appropriate. "
+                      . "**Strictly output only the post text itself**, with no introduction, explanation, or quotation marks.";
 
          $generationTopic = "The post should be about: ";
          if (!empty($userPromptContext)) {
