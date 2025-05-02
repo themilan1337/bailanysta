@@ -1,6 +1,8 @@
 <?php
 
-date_default_timezone_set('Asia/Almaty');
+// +5gmt
+date_default_timezone_set("Asia/Karachi");
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // --- app cfg ---
