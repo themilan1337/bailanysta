@@ -22,7 +22,7 @@ define('GOOGLE_CLIENT_ID', '2547332709-jmtah33q6j6eu7copud1c6s8356vml4v.apps.goo
 define('GOOGLE_CLIENT_SECRET', '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');
 define('GOOGLE_REDIRECT_URI', BASE_URL . '/auth/google/callback');
 
-define('GEMINI_API_KEY', 'AIzaSyDGsts9l3_8LWKzeYCiC_UCREVlDyJ9cnI');
+define('DEEPINFRA_API_KEY', 'BT6umGVaGXQW3xQmB3k2A2BJZc9kcDww');
 
 // --- helpers ---
 function config(string $key, $default = null) {
