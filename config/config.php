@@ -19,7 +19,7 @@ define('DB_CHARSET', 'utf8mb4');
 
 // --- google sign in ---
 define('GOOGLE_CLIENT_ID', '2547332709-jmtah33q6j6eu7copud1c6s8356vml4v.apps.googleusercontent.com');
-define('GOOGLE_CLIENT_SECRET', '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');
+define('GOOGLE_CLIENT_SECRET', '');
 define('GOOGLE_REDIRECT_URI', BASE_URL . '/auth/google/callback');
 
 define('DEEPINFRA_API_KEY', ''); //deepinfra.com
