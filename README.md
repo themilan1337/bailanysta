@@ -1,7 +1,7 @@
 # Bailanysta
 
 # Demo: https://bailanysta.gorislavets.com/
-# Video Demo: potom
+# Video Demo: [*click*](https://youtu.be/_chfig13dPk?si=7_rFDo64PNT1mlz8)
 
 ## Краткое описание проекта
 
