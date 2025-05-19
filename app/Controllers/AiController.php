@@ -21,7 +21,7 @@ class AiController
         // Get DeepInfra API Key
         $this->apiKey = config('DEEPINFRA_API_KEY', '');
 
-        if (empty($this->apiKey) || $this->apiKey === 'BT6umGVaGXQW3xQmB3k2A2BJZc9kcDww') {
+        if (empty($this->apiKey) || $this->apiKey === '') { //deepinfra.com token suda
              error_log("DeepInfra API Key is not configured correctly in config.php");
              // We'll handle this failure within the method call
         }

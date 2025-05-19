@@ -1,6 +1,7 @@
 {
   "name": "bailanysta",
-  "version": "1.0.0",
+  "author": "Milan Gorislavets",
+  "version": "1.0.3",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
